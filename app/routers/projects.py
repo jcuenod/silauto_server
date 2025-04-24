@@ -9,6 +9,9 @@ from fastapi import APIRouter, HTTPException, status, UploadFile, File
 
 from app.constants import PARATEXT_PROJECTS_DIR
 from app.models import Project, ProjectUpdate # Removed ProjectCreate
+# Import Task related components needed for creation
+from app.models import Task, TaskKind, TaskStatus
+from app.routers.tasks import fake_tasks_db # Import the task storage
 
 # --- Configuration ---
 # Get upload folder from environment variable, default to './uploads' if not set
@@ -91,13 +94,17 @@ def load_project_from_path(project_path: Path) -> Optional[Project]:
 
 
     return Project(
-        id=project_id,
+        id=str(project_id), # Ensure ID is string
         created_at=created_at_dt,
         full_name=project_data["full_name"],
         name=project_data["name"],
         lang=project_data["lang"],
         iso_code=project_data["iso_code"],
-        path=str(project_path.resolve())
+        path=str(project_path.resolve()),
+        # Note: We don't know the extract_task_id when just scanning existing folders
+        # It needs to be discovered by looking up tasks associated with this project_id
+        # For now, it will be None when loaded via scan_projects.
+        extract_task_id=None
     )
 
 def scan_projects() -> List[Project]:
@@ -189,17 +196,42 @@ async def create_project(files: List[UploadFile] = File(..., description="Projec
         if not project_data:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Failed to parse 'Settings.xml' ({settings_xml_path}).")
 
-        # Create Project object
+        # --- Create Associated Extract Task ---
+        extract_task_id = uuid.uuid4()
+        extract_task = Task(
+            id=extract_task_id,
+            kind=TaskKind.EXTRACT,
+            status=TaskStatus.QUEUED,
+            created_at=datetime.now(timezone.utc), # Use timezone aware datetime
+            project_id=project_id # Link task back to the project
+        )
+        fake_tasks_db[extract_task_id] = extract_task
+        print(f"Created associated extract task {extract_task_id} for project {project_id}")
+        # --- End Task Creation ---
+
+        # Create Project object, including the extract task ID
+        # Use creation time from filesystem if possible, fallback needed
+        try:
+            stat_result = project_path.stat()
+            created_timestamp = getattr(stat_result, 'st_birthtime', stat_result.st_ctime)
+            created_at_dt = datetime.fromtimestamp(created_timestamp, tz=timezone.utc)
+        except Exception as e:
+            print(f"Warning: Could not get creation time for {project_path}, using current time: {e}")
+            created_at_dt = datetime.now(timezone.utc) # Fallback to current time
+
         db_project = Project(
-            id=project_id,
-            created_at=datetime.utcnow(),
+            id=str(project_id), # Ensure ID is stored as string if model expects string
+            created_at=created_at_dt,
             name=project_data["name"],
+            full_name=project_data["full_name"], # Add full_name if parsed
+            lang=project_data["lang"],           # Add lang if parsed
             iso_code=project_data["iso_code"],
-            path=str(project_path.resolve()) # Store the absolute path
+            path=str(project_path.resolve()), # Store the absolute path
+            extract_task_id=extract_task_id # Store the link to the task
         )
         # Add the new project to the cache
         project_cache[project_id] = db_project
-        print(f"Added project {project_id} to cache.")
+        print(f"Added project {project_id} to cache with extract task {extract_task_id}.")
         return db_project
 
     except Exception as e:

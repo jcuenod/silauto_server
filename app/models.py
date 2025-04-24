@@ -29,8 +29,9 @@ class ProjectBase(BaseModel):
     path: str
 
 class Project(ProjectBase):
-    id: str
+    id: str # Keep as string if loaded from path name, but UUID if generated? Let's keep string for now.
     created_at: datetime
+    extract_task_id: Optional[uuid.UUID] = None # Link to the extract task
 
 # --- Base Task Model (Internal Representation) ---
 # This is what we store and return. It includes common fields.
@@ -43,6 +44,11 @@ class Task(BaseModel):
     ended_at: Optional[datetime] = None
     result: Optional[Dict[str, Any]] = None # Flexible result storage
     error: Optional[str] = None
+    # Add fields to store associated project IDs directly on the task model
+    # These might be redundant if always derivable from parameters, but can simplify queries
+    project_id: Optional[uuid.UUID] = None # For tasks associated with a single project (like extract)
+    target_project_id: Optional[uuid.UUID] = None # For tasks like align, train, translate
+    source_project_ids: Optional[List[uuid.UUID]] = None # For tasks like align, train, translate
 
 # --- Task Creation Models (Input for specific endpoints) ---
 
@@ -70,6 +76,9 @@ class TranslateTaskCreate(BaseModel):
     source_script_code: str = Field(..., description="Source language and script code (e.g., 'iso-Script')")
     target_script_code: str = Field(..., description="Target language and script code (e.g., 'iso-Script')")
     # Add other translation-specific parameters if needed
+
+class ExtractTaskCreate(BaseModel):
+    project_id: uuid.UUID # The project to extract from
 
 # --- Update Models (Optional but good practice) ---
 

@@ -4,13 +4,14 @@ from datetime import datetime, timezone
 from typing import List, Dict, Optional
 from fastapi import APIRouter, HTTPException, status
 
+import uuid # Ensure uuid is imported if not already
 # Updated model imports
 from app.models import (
     Task, TaskKind, TaskStatus, TaskUpdate,
-    AlignTaskCreate, TrainTaskCreate, TranslateTaskCreate # Specific create models
+    AlignTaskCreate, TrainTaskCreate, TranslateTaskCreate, ExtractTaskCreate # Added ExtractTaskCreate
 )
 # Import project cache and helper instead of filesystem functions directly
-from app.routers.projects import project_cache
+from app.routers.projects import project_cache, Project # Import Project for type hinting if needed
 
 router = APIRouter(
     prefix="/tasks",
@@ -33,6 +34,15 @@ def _validate_project_ids_exist(project_ids: List[uuid.UUID]):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Project(s) not found in cache: {', '.join(missing_projects)}"
+        )
+
+# --- Helper Function for Single Project Validation ---
+def _validate_project_id_exists(project_id: uuid.UUID):
+    """Checks if a single project ID exists in the cache."""
+    if project_id not in project_cache:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Project with ID {project_id} not found in cache."
         )
 
 # --- Helper Function for Task Validation ---
@@ -74,7 +84,10 @@ async def create_align_task(params: AlignTaskCreate):
         id=task_id,
         kind=TaskKind.ALIGN,
         status=TaskStatus.QUEUED,
-        created_at=datetime.now(datetime.timezone.utc),
+        created_at=datetime.now(timezone.utc),
+        # Store relevant project IDs directly on the task
+        target_project_id=params.target_project_id,
+        source_project_ids=params.source_project_ids
     )
     fake_tasks_db[task_id] = db_task
     return db_task
@@ -94,7 +107,13 @@ async def create_train_task(params: TrainTaskCreate):
         id=task_id,
         kind=TaskKind.TRAIN,
         status=TaskStatus.QUEUED,
-        created_at=datetime.now(datetime.timezone.utc),
+        created_at=datetime.now(timezone.utc),
+        # Store relevant project IDs directly on the task
+        # Assuming TrainTaskCreate also has target/source project IDs like AlignTaskCreate
+        # If not, adjust accordingly or add them to TrainTaskCreate model
+        # target_project_id=params.target_project_id,
+        # source_project_ids=params.source_project_ids
+        # If TrainTaskCreate doesn't define these, remove or adjust the above lines
     )
     fake_tasks_db[task_id] = db_task
     return db_task
@@ -126,10 +145,31 @@ async def create_translate_task(params: TranslateTaskCreate):
         id=task_id,
         kind=TaskKind.TRANSLATE,
         status=TaskStatus.QUEUED,
-        created_at=datetime.utcnow(tz=timezone.utc),
+        created_at=datetime.now(timezone.utc),
         target_project_id=params.target_project_id,
         source_project_ids=[params.source_project_id], # Store the text source project ID
-        parameters=params.dict() # Includes train_task_id, books, scripts etc.
+        # Store other parameters if needed, maybe in a dedicated 'parameters' field if added back to Task model
+        # parameters=params.dict(exclude={'target_project_id', 'source_project_id'})
+    )
+    fake_tasks_db[task_id] = db_task
+    return db_task
+
+@router.post("/extract", response_model=Task, status_code=status.HTTP_201_CREATED, summary="Create Extraction Task")
+async def create_extract_task(params: ExtractTaskCreate):
+    """
+    Create a new **Extraction** task.
+    Requires a valid project ID.
+    """
+    # Validate project
+    _validate_project_id_exists(params.project_id) # Use the single ID validator
+
+    task_id = uuid.uuid4()
+    db_task = Task(
+        id=task_id,
+        kind=TaskKind.EXTRACT,
+        status=TaskStatus.QUEUED,
+        created_at=datetime.now(timezone.utc),
+        project_id=params.project_id # Store the associated project ID
     )
     fake_tasks_db[task_id] = db_task
     return db_task
