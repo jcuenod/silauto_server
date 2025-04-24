@@ -35,9 +35,11 @@ async def startup_event():
     print("Application startup: Initializing project cache...")
     # Run the scan in the background if it's potentially long-running,
     # though for initial startup, running it directly might be acceptable.
-    # If scanners become async: await asyncio.gather(scan_projects(), scan_scriptures())
+    # Run synchronous scans first, then await asynchronous ones.
+    # If scan_projects were async, it would be:
+    # await asyncio.gather(scan_projects(), scan_scriptures())
     scan_projects() # Run the synchronous project scan function
-    scan_scriptures() # Run the synchronous scripture scan function
+    await scan_scriptures() # Await the asynchronous scripture scan function
     print("Caches initialized.")
 
 
