@@ -1,11 +1,13 @@
 import asyncio
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import Any, List, Dict, Optional
 from fastapi import APIRouter, Query
 from vref_utils import Vref
+from ..state import scripture_cache
 
 from app.constants import SCRIPTURE_DIR
 from app.models import Scripture
+from app.config import MAX_CONCURRENT_FILE_PROCESSING
 
 router = APIRouter(
     prefix="/scriptures",
@@ -13,33 +15,31 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-# --- Scripture Cache ---
-# Populated on startup
-scripture_cache: Dict[str, Scripture] = {} # Keyed by filename
+
 # --- Helper Functions ---
+def _create_vref_and_get_stats(file_path_str: str) -> Dict[str, Any]:
+    """Creates a Vref instance and returns its stats dictionary."""
+    vref_instance = Vref(file_path_str)
+    return vref_instance.stats
+
 
 async def _process_scripture_file(file_path: Path) -> Optional[Scripture]:
     """Processes a single scripture file asynchronously."""
     try:
         # Run the potentially blocking Vref call in a separate thread
-        vref_stats = await asyncio.to_thread(Vref(str(file_path)).stats)
+        file_path_str = str(file_path)
+        lang_code, id_with_extension = file_path.name.split("-", 1)
+        id = id_with_extension[:-4]
+        vref_stats = await asyncio.to_thread(_create_vref_and_get_stats, file_path_str)
         return Scripture(
-            name=file_path.name,
-            path=str(file_path.resolve()),
-            stats=vref_stats
+            id=id, lang_code=lang_code, path=str(file_path.resolve()), stats=vref_stats
         )
     except Exception as e:
         print(f"Error processing scripture file {file_path.name}: {e}")
-        # Return None or a placeholder if needed
         return None
-        # Optionally return a placeholder with error info:
-        # return Scripture(
-        #     name=file_path.name,
-        #     path=str(file_path.resolve()),
-        #     stats={"error": str(e)}
-        # )
 
-async def scan_scriptures():
+
+async def scan():
     """
     Asynchronously scans the SILNLP_DATA/Paratext/scripture directory for .txt files,
     calculates stats using Vref in threads, and populates the cache.
@@ -54,15 +54,34 @@ async def scan_scriptures():
         return
 
     file_paths = [fp for fp in SCRIPTURE_DIR.glob("*.txt") if fp.is_file()]
+    total_files = len(file_paths)
+
+    if total_files == 0:
+        print("No scripture files found.")
+        scripture_cache = {}
+        return
+
+    print(f"Found {total_files} scripture files to process...")
+
+    # Use a semaphore to limit concurrent file processing
+    semaphore = asyncio.Semaphore(MAX_CONCURRENT_FILE_PROCESSING)
+
+    async def process_with_semaphore(fp):
+        async with semaphore:
+            return await _process_scripture_file(fp)
 
     # Create tasks for processing each file concurrently
-    tasks = [_process_scripture_file(fp) for fp in file_paths]
-    results = await asyncio.gather(*tasks)
+    tasks = [process_with_semaphore(fp) for fp in file_paths]
 
-    # Filter out None results (errors) and build the dictionary
-    for scripture in results:
+    # Process files with progress reporting
+    completed = 0
+    for coro in asyncio.as_completed(tasks):
+        scripture = await coro
+        completed += 1
+        if completed % 10 == 0 or completed == total_files:
+            print(f"Processed {completed}/{total_files} scripture files...")
         if scripture:
-            processed_scriptures[scripture.name] = scripture
+            processed_scriptures[scripture.id] = scripture
 
     # Sort by name for consistent ordering
     sorted_names = sorted(processed_scriptures.keys())
@@ -72,8 +91,15 @@ async def scan_scriptures():
 
 # --- API Routes ---
 
+
 @router.get("/", response_model=List[Scripture])
-async def read_scriptures(query: Optional[str] = Query(None, description="Search term to filter scriptures by name (case-insensitive)")):
+async def read_scriptures(
+    skip: int = 0,
+    limit: int = 100,
+    query: Optional[str] = Query(
+        None, description="Search term to filter scriptures by name (case-insensitive)"
+    ),
+):
     """
     Retrieve a list of available scripture files and their statistics.
     Optionally filter by a query string contained within the filename.
@@ -82,6 +108,10 @@ async def read_scriptures(query: Optional[str] = Query(None, description="Search
 
     if query:
         query_lower = query.lower()
-        scriptures = [s for s in scriptures if query_lower in s.name.lower()]
+        scriptures = [
+            s
+            for s in scriptures
+            if query_lower in s.id.lower() or query_lower in s.lang_code.lower()
+        ]
 
     return scriptures

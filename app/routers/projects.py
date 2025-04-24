@@ -4,22 +4,16 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Dict, Optional
-import uuid
 from fastapi import APIRouter, HTTPException, status, UploadFile, File
+from ..state import tasks_cache, project_cache
 
 from app.constants import PARATEXT_PROJECTS_DIR
-from app.models import Project, ProjectUpdate # Removed ProjectCreate
+from app.models import ExtractTaskParams, ParatextProject
+
 # Import Task related components needed for creation
 from app.models import Task, TaskKind, TaskStatus
-from app.routers.tasks import fake_tasks_db # Import the task storage
 
-# --- Configuration ---
-# Get upload folder from environment variable, default to './uploads' if not set
-PARATEXT_PROJECTS_DIR.mkdir(parents=True, exist_ok=True) # Ensure upload folder exists
-
-# --- Project Cache ---
-# Populated on startup and modified by CRUD operations
-project_cache: Dict[uuid.UUID, Project] = {}
+PARATEXT_PROJECTS_DIR.mkdir(parents=True, exist_ok=True)  # Ensure upload folder exists
 
 
 router = APIRouter(
@@ -28,13 +22,11 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-# Removed in-memory storage: fake_projects_db
 
-# --- Helper Functions ---
-
-def get_project_path(project_id: uuid.UUID) -> Path:
+def get_project_path(project_id: str) -> Path:
     """Returns the expected path for a given project ID."""
     return PARATEXT_PROJECTS_DIR / str(project_id)
+
 
 def parse_settings_xml(file_path: Path) -> Optional[Dict[str, str]]:
     """Parses Settings.xml to extract project metadata."""
@@ -43,14 +35,27 @@ def parse_settings_xml(file_path: Path) -> Optional[Dict[str, str]]:
         root = tree.getroot()
         # Adjust find() calls based on the actual XML structure
         # Example: assumes <settings><name>...</name><iso_code>...</iso_code></settings>
-        language_element = root.find('Language')
-        name_element = root.find('Name')
-        fullname_element = root.find('FullName')
-        iso_code_element = root.find('LanguageIsoCode')
+        language_element = root.find("Language")
+        name_element = root.find("Name")
+        fullname_element = root.find("FullName")
+        iso_code_element = root.find("LanguageIsoCode")
 
-        if name_element is not None and name_element.text and \
-           iso_code_element is not None and iso_code_element.text:
-            return {"name": name_element.text, "full_name": fullname_element.text, "lang": language_element.text, "iso_code": iso_code_element.text}
+        if (
+            name_element is not None
+            and name_element.text
+            and iso_code_element is not None
+            and iso_code_element.text
+        ):
+            return {
+                "name": name_element.text,
+                "full_name": fullname_element.text
+                if fullname_element is not None and fullname_element.text
+                else "",
+                "lang": language_element.text
+                if language_element is not None and language_element.text
+                else "",
+                "iso_code": iso_code_element.text,
+            }
         else:
             # Log warning or handle missing elements if needed
             print(f"Missing required elements in {file_path}")
@@ -64,7 +69,8 @@ def parse_settings_xml(file_path: Path) -> Optional[Dict[str, str]]:
         print(f"File not found: {file_path}")
         return None
 
-def load_project_from_path(project_path: Path) -> Optional[Project]:
+
+def load_project_from_path(project_path: Path) -> Optional[ParatextProject]:
     """Loads project data from its directory path."""
     if not project_path.is_dir():
         return None
@@ -85,16 +91,15 @@ def load_project_from_path(project_path: Path) -> Optional[Project]:
         # Get directory creation time (use mtime as a fallback for ctime availability)
         stat_result = project_path.stat()
         # Use ctime if available (creation time on Unix), otherwise mtime (last metadata change)
-        created_timestamp = getattr(stat_result, 'st_birthtime', stat_result.st_ctime)
+        created_timestamp = getattr(stat_result, "st_birthtime", stat_result.st_ctime)
         created_at_dt = datetime.fromtimestamp(created_timestamp, tz=timezone.utc)
     except Exception as e:
         print(f"Warning: Could not get creation time for {project_path}: {e}")
         # Fallback to current time or handle differently? Using epoch for now.
         created_at_dt = datetime.fromtimestamp(0, tz=timezone.utc)
 
-
-    return Project(
-        id=str(project_id), # Ensure ID is string
+    return ParatextProject(
+        id=str(project_id),  # Ensure ID is string
         created_at=created_at_dt,
         full_name=project_data["full_name"],
         name=project_data["name"],
@@ -104,31 +109,42 @@ def load_project_from_path(project_path: Path) -> Optional[Project]:
         # Note: We don't know the extract_task_id when just scanning existing folders
         # It needs to be discovered by looking up tasks associated with this project_id
         # For now, it will be None when loaded via scan_projects.
-        extract_task_id=None
+        extract_task_id=None,
     )
 
-def scan_projects() -> List[Project]:
+
+def scan() -> List[ParatextProject]:
     """
     Scans the PARATEXT_PROJECTS_DIR for valid project directories, populates the cache,
     and returns a list of projects.
     """
     global project_cache
     print(f"Scanning {PARATEXT_PROJECTS_DIR} for projects...")
-    found_projects: Dict[uuid.UUID, Project] = {}
+    found_projects: Dict[str, ParatextProject] = {}
     if not PARATEXT_PROJECTS_DIR.is_dir():
-        print(f"Warning: PARATEXT_PROJECTS_DIR '{PARATEXT_PROJECTS_DIR}' does not exist or is not a directory.")
-        project_cache = {} # Clear cache if folder is gone
+        print(
+            f"Warning: PARATEXT_PROJECTS_DIR '{PARATEXT_PROJECTS_DIR}' does not exist or is not a directory."
+        )
+        project_cache = {}  # Clear cache if folder is gone
         return []
 
     for item in PARATEXT_PROJECTS_DIR.iterdir():
-        # if dir is "/_projectsById", then we check it for other projects...
         if item.is_dir():
-            project = load_project_from_path(item)
-            if project:
-                found_projects[project.id] = project
+            # if dir is "/_projectsById", then we check it for other projects...
+            if item.name == "_projectsById":
+                for subitem in item.iterdir():
+                    project = load_project_from_path(subitem)
+                    if project:
+                        found_projects[project.id] = project
+            else:
+                project = load_project_from_path(item)
+                if project:
+                    found_projects[project.id] = project
 
     # Sort projects by creation date, newest first
-    sorted_projects = sorted(found_projects.values(), key=lambda p: p.created_at, reverse=True)
+    sorted_projects = sorted(
+        found_projects.values(), key=lambda p: p.created_at, reverse=True
+    )
 
     # Update the global cache
     project_cache = {p.id: p for p in sorted_projects}
@@ -138,41 +154,61 @@ def scan_projects() -> List[Project]:
 
 # --- API Routes ---
 
-@router.post("/", response_model=Project, status_code=status.HTTP_201_CREATED)
-async def create_project(files: List[UploadFile] = File(..., description="Project files, including Settings.xml")):
+
+@router.post("/", response_model=ParatextProject, status_code=status.HTTP_201_CREATED)
+async def create_project(
+    files: List[UploadFile] = File(
+        ..., description="Project files, including Settings.xml"
+    ),
+):
     """
     Create a new project by uploading its files.
 
     Requires a 'Settings.xml' file within the upload to define project metadata.
     Files will be stored in a unique directory under the configured PARATEXT_PROJECTS_DIR.
     """
-    project_id = uuid.uuid4()
-    project_path = PARATEXT_PROJECTS_DIR / str(project_id)
+    project_id = str(uuid.uuid4())
+    project_path = PARATEXT_PROJECTS_DIR / project_id
     print(f"Creating project directory at: {project_path}")
 
     try:
         project_path.mkdir(parents=True, exist_ok=False)
     except FileExistsError:
         # Extremely unlikely with UUIDs, but handle defensively
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create unique project directory.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create unique project directory.",
+        )
     except OSError as e:
         # Handle other potential filesystem errors (permissions, etc.)
         # Log the error e
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create project directory.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create project directory.",
+        )
 
     saved_files: List[Path] = []
 
     try:
         for file in files:
-            if not file.filename: # Should not happen with FastAPI File(...) but check
-                 continue
+            if not file.filename:  # Should not happen with FastAPI File(...) but check
+                continue
             # Basic security: prevent path traversal attacks
             if ".." in file.filename or file.filename.startswith("/"):
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid filename: {file.filename}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid filename: {file.filename}",
+                )
 
-            file_location = project_path / file.filename
+            # We expect the filename to be like project_folder/file1 ...
+            # So we need to remove the leading directory (but preserve the folder structure)
+            # because we're basically replacing that part with the project_id
+            parts = file.filename.split("/")
+            without_leading_dir = "/".join(parts[1:]) if len(parts) > 1 else parts[0]
+            file_location = project_path / without_leading_dir
+            print(file_location)
             saved_files.append(file_location)
-            
+
             # make sure the directory exists
             file_location.parent.mkdir(parents=True, exist_ok=True)
 
@@ -180,69 +216,90 @@ async def create_project(files: List[UploadFile] = File(..., description="Projec
                 with open(file_location, "wb+") as file_object:
                     shutil.copyfileobj(file.file, file_object)
             except Exception as e:
-                 # Log error e
-                 print(f"Error saving file {file.filename}: {e}")
-                 raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to save file: {file.filename}")
+                # Log error e
+                print(f"Error saving file {file.filename}: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to save file: {file.filename}",
+                )
             finally:
-                file.file.close() # Ensure the UploadFile resource is closed
+                file.file.close()  # Ensure the UploadFile resource is closed
 
         # Check for Settings.xml in the project root
         settings_xml_path = project_path / "Settings.xml"
         if not settings_xml_path.exists():
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing 'Settings.xml' in uploaded files.")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing 'Settings.xml' in uploaded files.",
+            )
 
         # Parse Settings.xml
         project_data = parse_settings_xml(settings_xml_path)
         if not project_data:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Failed to parse 'Settings.xml' ({settings_xml_path}).")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to parse 'Settings.xml' ({settings_xml_path}).",
+            )
 
         # --- Create Associated Extract Task ---
-        extract_task_id = uuid.uuid4()
+        extract_task_id = str(uuid.uuid4())
         extract_task = Task(
             id=extract_task_id,
             kind=TaskKind.EXTRACT,
             status=TaskStatus.QUEUED,
-            created_at=datetime.now(timezone.utc), # Use timezone aware datetime
-            project_id=project_id # Link task back to the project
+            created_at=datetime.now(timezone.utc),  # Use timezone aware datetime
+            parameters=ExtractTaskParams(
+                project_id=project_id
+            ),  # Add required parameters field
         )
-        fake_tasks_db[extract_task_id] = extract_task
-        print(f"Created associated extract task {extract_task_id} for project {project_id}")
+        tasks_cache[extract_task_id] = extract_task
+        print(
+            f"Created associated extract task {extract_task_id} for project {project_id}"
+        )
         # --- End Task Creation ---
 
         # Create Project object, including the extract task ID
         # Use creation time from filesystem if possible, fallback needed
         try:
             stat_result = project_path.stat()
-            created_timestamp = getattr(stat_result, 'st_birthtime', stat_result.st_ctime)
+            created_timestamp = getattr(
+                stat_result, "st_birthtime", stat_result.st_ctime
+            )
             created_at_dt = datetime.fromtimestamp(created_timestamp, tz=timezone.utc)
         except Exception as e:
-            print(f"Warning: Could not get creation time for {project_path}, using current time: {e}")
-            created_at_dt = datetime.now(timezone.utc) # Fallback to current time
+            print(
+                f"Warning: Could not get creation time for {project_path}, using current time: {e}"
+            )
+            created_at_dt = datetime.now(timezone.utc)  # Fallback to current time
 
-        db_project = Project(
-            id=str(project_id), # Ensure ID is stored as string if model expects string
+        db_project = ParatextProject(
+            id=str(project_id),  # Ensure ID is stored as string if model expects string
             created_at=created_at_dt,
             name=project_data["name"],
-            full_name=project_data["full_name"], # Add full_name if parsed
-            lang=project_data["lang"],           # Add lang if parsed
+            full_name=project_data["full_name"],  # Add full_name if parsed
+            lang=project_data["lang"],  # Add lang if parsed
             iso_code=project_data["iso_code"],
-            path=str(project_path.resolve()), # Store the absolute path
-            extract_task_id=extract_task_id # Store the link to the task
+            path=str(project_path.resolve()),  # Store the absolute path
+            extract_task_id=extract_task_id,  # Store the link to the task
         )
         # Add the new project to the cache
         project_cache[project_id] = db_project
-        print(f"Added project {project_id} to cache with extract task {extract_task_id}.")
+        print(
+            f"Added project {project_id} to cache with extract task {extract_task_id}."
+        )
         return db_project
 
     except Exception as e:
         # General cleanup: If any error occurs during processing, remove the created directory
         if project_path.exists():
-            shutil.rmtree(project_path, ignore_errors=True) # Use ignore_errors for cleanup
+            shutil.rmtree(
+                project_path, ignore_errors=True
+            )  # Use ignore_errors for cleanup
         # Re-raise the exception (could be HTTPException or other)
         raise e
 
 
-@router.get("/", response_model=List[Project])
+@router.get("/", response_model=List[ParatextProject])
 async def read_projects(skip: int = 0, limit: int = 100):
     """
     Retrieve a list of projects from the cache.
@@ -255,8 +312,9 @@ async def read_projects(skip: int = 0, limit: int = 100):
     projects.sort(key=lambda p: p.created_at, reverse=True)
     return projects[skip : skip + limit]
 
-@router.get("/{project_id}", response_model=Project)
-async def read_project(project_id: uuid.UUID):
+
+@router.get("/{project_id}", response_model=ParatextProject)
+async def read_project(project_id: str):
     """
     Retrieve a single project by its ID from the cache.
     """
@@ -264,95 +322,56 @@ async def read_project(project_id: uuid.UUID):
     if project is None:
         # Optional: Could trigger a rescan here if not found in cache, but for now, rely on cache
         # print(f"Project {project_id} not found in cache. Consider rescanning.")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Project with ID {project_id} not found in cache")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project with ID {project_id} not found in cache",
+        )
     return project
-
-@router.put("/{project_id}", response_model=Project)
-async def update_project(project_id: uuid.UUID, project_update: ProjectUpdate):
-    """
-    Update an existing project (Not Implemented).
-
-    Updating project metadata stored in Settings.xml or changing the path
-    requires careful handling and is not implemented in this version.
-    """
-    # Check if project exists first
-    project_path = get_project_path(project_id)
-    if not project_path.is_dir():
-         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Project with ID {project_id} not found")
-
-    # Raise 501 Not Implemented
-    raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Updating projects is not currently supported.")
-
-    # --- Placeholder for future implementation ---
-    # db_project = load_project_from_path(project_path) # Load current data
-    # if db_project is None: # Should not happen if directory exists, but check
-    #     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project data could not be loaded")
-    #
-    # update_data = project_update.dict(exclude_unset=True)
-    #
-    # # Logic to update Settings.xml based on update_data['name'] or update_data['iso_code']
-    # settings_xml_path = project_path / "Settings.xml"
-    # if 'name' in update_data or 'iso_code' in update_data:
-    #     try:
-    #         tree = ET.parse(settings_xml_path)
-    #         root = tree.getroot()
-    #         # Find and update elements - adjust based on actual XML structure
-    #         if 'name' in update_data:
-    #             # This assumes the name format "Lang (Fullname)" - needs careful parsing/updating
-    #             pass # Add logic here
-    #         if 'iso_code' in update_data:
-    #             iso_code_el = root.find('LanguageIsoCode')
-    #             if iso_code_el is not None:
-    #                 iso_code_el.text = update_data['iso_code']
-    #             else:
-    #                  # Handle case where element doesn't exist?
-    #                  pass
-    #         tree.write(settings_xml_path)
-    #     except Exception as e:
-    #         # Log error
-    #         raise HTTPException(status_code=500, detail=f"Failed to update Settings.xml: {e}")
-    #
-    # # Reload the project data after update
-    # updated_project = load_project_from_path(project_path)
-    # if updated_project is None:
-    #      raise HTTPException(status_code=500, detail="Failed to reload project data after update")
-    #
-    # return updated_project
-    # --- End Placeholder ---
 
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_project(project_id: uuid.UUID):
+async def delete_project(project_id: str):
     """
     Delete a project by removing its directory and cache entry.
     """
     # Check cache first
     if project_id not in project_cache:
-         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Project with ID {project_id} not found in cache")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project with ID {project_id} not found in cache",
+        )
 
     project_path = get_project_path(project_id)
 
     # Double-check filesystem existence before attempting deletion
     if not project_path.is_dir():
-        print(f"Warning: Project {project_id} found in cache but directory not found at {project_path}. Removing from cache.")
+        print(
+            f"Warning: Project {project_id} found in cache but directory not found at {project_path}. Removing from cache."
+        )
         # Remove from cache even if directory is missing
         del project_cache[project_id]
         # Return 404 as the resource state is inconsistent/not found on disk
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Project directory for ID {project_id} not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project directory for ID {project_id} not found",
+        )
 
     try:
         shutil.rmtree(project_path)
         print(f"Deleted project directory: {project_path}")
         # Remove from cache *after* successful deletion
         if project_id in project_cache:
-             del project_cache[project_id]
-             print(f"Removed project {project_id} from cache.")
+            del project_cache[project_id]
+            print(f"Removed project {project_id} from cache.")
 
     except OSError as e:
         print(f"Error deleting project directory {project_path}: {e}")
         # Log error e
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to delete project directory: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete project directory: {e}",
+        )
 
     # Also consider deleting associated tasks if necessary (requires task router interaction)
 
-    return None # No content response
+    return None  # No content response

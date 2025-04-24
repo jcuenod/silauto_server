@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+
 load_dotenv()
 
 SILNLP_DATA = os.getenv("SILNLP_DATA", "~/silnlp_data")
@@ -11,5 +12,5 @@ if not os.path.isabs(SILNLP_DATA):
 SILNLP_DATA = Path(SILNLP_DATA)
 
 PARATEXT_PROJECTS_DIR = SILNLP_DATA / "Paratext/projects"
-EXPERIMENTS_DIR = SILNLP_DATA / "experiments/MT"
-SCRIPTURE_DIR = SILNLP_DATA / "Paratext/scripture"
+EXPERIMENTS_DIR = SILNLP_DATA / "MT/experiments"
+SCRIPTURE_DIR = SILNLP_DATA / "MT/scripture"
