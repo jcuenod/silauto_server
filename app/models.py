@@ -29,7 +29,7 @@ class ProjectBase(BaseModel):
     path: str
 
 class Project(ProjectBase):
-    id: uuid.UUID
+    id: str
     created_at: datetime
 
 # --- Base Task Model (Internal Representation) ---

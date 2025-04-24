@@ -71,11 +71,7 @@ def load_project_from_path(project_path: Path) -> Optional[Project]:
         print(f"Warning: Settings.xml not found in {project_path}")
         return None
 
-    try:
-        project_id = uuid.UUID(project_path.name)
-    except ValueError:
-        print(f"Warning: Invalid directory name (not a UUID): {project_path.name}")
-        return None
+    project_id = project_path.name
 
     project_data = parse_settings_xml(settings_xml_path)
     if not project_data:
@@ -118,6 +114,7 @@ def scan_projects() -> List[Project]:
         return []
 
     for item in PARATEXT_PROJECTS_DIR.iterdir():
+        # if dir is "/_projectsById", then we check it for other projects...
         if item.is_dir():
             project = load_project_from_path(item)
             if project:
