@@ -71,7 +71,7 @@ class TrainTaskParams(BaseModel):
         description="List of book identifiers (e.g., 'NT', or 'MAT', 'MRK') to use for training",
     )
     lang_codes: Dict[str, str]
-    results: Optional[Dict[str, Dict[str, str]]]
+    results: Optional[Dict[str, Dict[str, Any]]]
     # config yml?
     # other settings...
 
