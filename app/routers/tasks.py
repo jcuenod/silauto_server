@@ -125,7 +125,6 @@ def load_experiment_from_path(experiment_path: Path) -> Optional[Task]:
         corpus_stats_file = experiment_path / "corpus-stats.csv"
         if corpus_stats_file.is_file():
             with open(corpus_stats_file, "r") as f:
-                print(corpus_stats_file.name)
                 reader = csv.DictReader(f)
                 for row in reader:
                     results.append(row)
@@ -163,9 +162,10 @@ def load_experiment_from_path(experiment_path: Path) -> Optional[Task]:
         results = {}
         for results_file in experiment_path.glob("scores-*.csv"):
             print(results_file.name)
-            if results_file.is_file():
-                with open(results_file, "r") as f:
-                    results[results_file.name] = f.read()
+            with open(results_file, "r") as f:
+                print(results_file.name)
+                reader = csv.DictReader(f)
+                results[results_file.name] = reader.__next__()
         if not results:
             results = None
 
