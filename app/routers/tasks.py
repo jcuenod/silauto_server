@@ -161,7 +161,7 @@ def load_experiment_from_path(experiment_path: Path) -> Optional[Task]:
 
         # Glob for results in files like ./scores-5000.csv
         results = {}
-        for results_file in experiment_path.glob("results/scores-*.csv"):
+        for results_file in experiment_path.glob("scores-*.csv"):
             print(results_file.name)
             if results_file.is_file():
                 with open(results_file, "r") as f:
