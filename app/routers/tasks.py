@@ -345,6 +345,7 @@ async def read_tasks(
     Retrieve a list of all tasks.
     """
 
+    all_tasks = get_all_tasks()
     if project_id:
         project = project_cache.get(project_id)
         if project is None:
@@ -352,9 +353,9 @@ async def read_tasks(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Project with ID {project_id} not found.",
             )
-        tasks = project.tasks
+        tasks = project.get_tasks(all_tasks)
     else:
-        tasks = get_all_tasks()
+        tasks = all_tasks
 
     return tasks[skip : skip + limit]
 

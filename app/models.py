@@ -40,10 +40,7 @@ class ParatextProject(BaseModel):
     def scripture_filename(self):
         return f"{self.iso_code}-{self.id}"
 
-    @property
-    def tasks(self):
-        tasks = list(tasks_cache.values())
-
+    def get_tasks(self, tasks):
         # let's get the likely scripture file name based on the project's id
         scripture_related_tasks = [
             t for t in tasks if t.has_scripture_file(self.scripture_filename)
