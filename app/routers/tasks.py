@@ -3,7 +3,7 @@ from pathlib import Path
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 import yaml
 
 from app.constants import EXPERIMENTS_DIR
@@ -22,10 +22,7 @@ from app.models import (
 )
 
 # Import project cache and helper instead of filesystem functions directly
-from app.routers.projects import (
-    project_cache,
-)
-from app.routers.scriptures import scripture_cache
+from app.state import scripture_cache, project_cache
 
 router = APIRouter(
     prefix="/tasks",
@@ -332,22 +329,58 @@ async def create_extract_task(params: ExtractTaskParams):
 
 
 # --- General Task Routes (Read, Update, Delete) ---
+def get_all_tasks():
+    tasks = list(tasks_cache.values())
+    tasks.sort(key=lambda t: t.created_at, reverse=True)
+    return tasks
+
+
+def get_project_specific_tasks(project_id):
+    tasks = list(tasks_cache.values())
+    tasks.sort(key=lambda t: t.created_at, reverse=True)
+
+    # let's get the likely scripture file name based on the project's id
+    scripture_related_tasks = []
+    if project_id in project_cache:
+        lang = project_cache[project_id].iso_code
+        scripture_file_name = f"{lang}-{project_id}"
+
+        def has_scripture_file(task: Task):
+            if task.kind == TaskKind.ALIGN or task.kind == TaskKind.TRAIN:
+                return task.parameters.target_scripture_file == scripture_file_name  # type: ignore (that's why we have the taskkind guard)
+            return False
+
+        scripture_related_tasks = [t for t in tasks if has_scripture_file(t)]
+
+    def has_project_id(task):
+        # ExtractTaskParams
+        if hasattr(task, "project_id") and task.project_id == project_id:
+            return True
+
+        # TranslateTaskParams
+        if hasattr(task, "source_project_id") and task.source_project_id == project_id:
+            return True
+
+        return False
+
+    project_related_tasks = [t for t in tasks if has_project_id(t)]
+
+    all_related_tasks = scripture_related_tasks + project_related_tasks
+    return all_related_tasks
 
 
 @router.get("/", response_model=List[Task])
 async def read_tasks(
     skip: int = 0,
     limit: int = 100,
-    # project_id: str = Query(None, description="Project ID to filter tasks by"),
+    project_id: str = Query(None, description="Project ID to filter tasks by"),
 ):
     """
     Retrieve a list of all tasks.
     """
 
-    tasks = list(tasks_cache.values())
+    tasks = get_project_specific_tasks(project_id) if project_id else get_all_tasks()
 
-    # Optional: Sort tasks, e.g., by creation date descending
-    tasks.sort(key=lambda t: t.created_at, reverse=True)
     return tasks[skip : skip + limit]
 
 

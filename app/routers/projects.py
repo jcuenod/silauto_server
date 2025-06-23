@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Dict, Optional
 from fastapi import APIRouter, HTTPException, status, UploadFile, File
-from ..state import tasks_cache, project_cache
+from app.state import tasks_cache, project_cache
 
 from app.constants import PARATEXT_PROJECTS_DIR
 from app.models import ExtractTaskParams, ParatextProject
@@ -125,7 +125,7 @@ def scan() -> List[ParatextProject]:
         print(
             f"Warning: PARATEXT_PROJECTS_DIR '{PARATEXT_PROJECTS_DIR}' does not exist or is not a directory."
         )
-        project_cache = {}  # Clear cache if folder is gone
+        project_cache.clear()
         return []
 
     for item in PARATEXT_PROJECTS_DIR.iterdir():
@@ -147,7 +147,8 @@ def scan() -> List[ParatextProject]:
     )
 
     # Update the global cache
-    project_cache = {p.id: p for p in sorted_projects}
+    project_cache.clear()
+    project_cache.update({p.id: p for p in sorted_projects})
     print(f"Project scan complete. Found {len(project_cache)} projects.")
     return sorted_projects
 
@@ -335,7 +336,7 @@ async def delete_project(project_id: str):
     Delete a project by removing its directory and cache entry.
     """
     # Check cache first
-    if project_id not in project_cache:
+    if not project_cache.get(project_id, None):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project with ID {project_id} not found in cache",
@@ -360,7 +361,7 @@ async def delete_project(project_id: str):
         shutil.rmtree(project_path)
         print(f"Deleted project directory: {project_path}")
         # Remove from cache *after* successful deletion
-        if project_id in project_cache:
+        if not project_cache.get(project_id, None):
             del project_cache[project_id]
             print(f"Removed project {project_id} from cache.")
 
