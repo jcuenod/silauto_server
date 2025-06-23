@@ -142,7 +142,10 @@ def load_experiment_from_path(experiment_path: Path) -> Optional[Task]:
         if isinstance(sources, str):
             sources = [sources]
 
+        # This is what silnlp will want for translate tasks
+        experiment_name = "/".join(str(experiment_path).split("/")[-2:])
         params = TrainTaskParams(
+            experiment_name=experiment_name,
             target_scripture_file=target,
             source_scripture_files=sources,
             training_corpus=training_corpus,
@@ -151,7 +154,7 @@ def load_experiment_from_path(experiment_path: Path) -> Optional[Task]:
         kind = TaskKind.TRAIN
 
     return Task(
-        id=str(experiment_path),
+        id=str(uuid.uuid4()),
         kind=kind,
         status=TaskStatus.COMPLETED,
         created_at=config_file_created_at,
