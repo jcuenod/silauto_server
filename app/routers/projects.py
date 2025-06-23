@@ -46,6 +46,8 @@ def parse_settings_xml(file_path: Path) -> Optional[Dict[str, str]]:
             and iso_code_element is not None
             and iso_code_element.text
         ):
+            # TODO: Consider extracting other data from this element. This element can also contain details like the script (but is not necessarily complete)
+            iso_code = iso_code_element.text.split(":")[0]
             return {
                 "name": name_element.text,
                 "full_name": fullname_element.text
@@ -54,7 +56,7 @@ def parse_settings_xml(file_path: Path) -> Optional[Dict[str, str]]:
                 "lang": language_element.text
                 if language_element is not None and language_element.text
                 else "",
-                "iso_code": iso_code_element.text.split(":")[0],
+                "iso_code": iso_code,
             }
         else:
             # Log warning or handle missing elements if needed

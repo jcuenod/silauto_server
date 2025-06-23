@@ -3,6 +3,8 @@ from enum import Enum
 from typing import List, Optional, Dict, Any, Union
 from pydantic import BaseModel, Field
 
+from app.state import tasks_cache
+
 # --- Enums ---
 
 
@@ -34,25 +36,24 @@ class ParatextProject(BaseModel):
     created_at: datetime
     extract_task_id: Optional[str] = None  # Link to the extract task
 
+    @property
+    def scripture_filename(self):
+        return f"{self.iso_code}-{self.id}"
 
-# class BaseExperiment(BaseModel):
-#     id: str
-#     project_id: str
+    @property
+    def tasks(self):
+        tasks = list(tasks_cache.values())
 
+        # let's get the likely scripture file name based on the project's id
+        scripture_related_tasks = [
+            t for t in tasks if t.has_scripture_file(self.scripture_filename)
+        ]
 
-# class DefaultExperiment(BaseExperiment):
-#     kind: Literal["default"] = "default"
-#     source_scripture_names: List[str]
-#     lang_codes: Dict[str, str]
+        project_related_tasks = [t for t in tasks if t.has_project_id(self.id)]
 
-
-# class CustomExperiment(BaseExperiment):
-#     kind: Literal["custom"] = "custom"
-#     custom_config: Optional[str]
-
-
-# # Union type for polymorphic handling
-# Experiment = Union[DefaultExperiment, CustomExperiment]
+        all_related_tasks = scripture_related_tasks + project_related_tasks
+        all_related_tasks.sort(key=lambda t: t.created_at, reverse=True)
+        return all_related_tasks
 
 
 # --- Base Task Model (Internal Representation) ---
@@ -114,6 +115,20 @@ class Task(BaseModel):
     result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
     parameters: TaskParams
+
+    def has_scripture_file(self, scripture_filename):
+        if self.kind == TaskKind.ALIGN or self.kind == TaskKind.TRAIN:
+            return self.parameters.target_scripture_file == scripture_filename  # type: ignore (that's why we have the taskkind guard)
+        return False
+
+    def has_project_id(self, project_id):
+        if self.kind == TaskKind.EXTRACT:
+            return self.parameters.project_id == project_id  # type: ignore
+
+        if self.kind == TaskKind.TRANSLATE:
+            return self.parameters.source_project_id == project_id  # type: ignore
+
+        return False
 
 
 class Scripture(BaseModel):

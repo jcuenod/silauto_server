@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 import yaml
 
 from app.constants import EXPERIMENTS_DIR
-from ..state import tasks_cache
+from app.state import tasks_cache
 
 # Updated model imports
 from app.models import (
@@ -328,47 +328,11 @@ async def create_extract_task(params: ExtractTaskParams):
     return db_task
 
 
-# --- General Task Routes (Read, Update, Delete) ---
+# # --- General Task Routes (Read, Update, Delete) ---
 def get_all_tasks():
     tasks = list(tasks_cache.values())
     tasks.sort(key=lambda t: t.created_at, reverse=True)
     return tasks
-
-
-def get_project_specific_tasks(project_id):
-    tasks = list(tasks_cache.values())
-    tasks.sort(key=lambda t: t.created_at, reverse=True)
-
-    # let's get the likely scripture file name based on the project's id
-    scripture_related_tasks = []
-    if project_id in project_cache:
-
-        def has_scripture_file(task: Task, scripture_filename):
-            if task.kind == TaskKind.ALIGN or task.kind == TaskKind.TRAIN:
-                return task.parameters.target_scripture_file == scripture_filename  # type: ignore (that's why we have the taskkind guard)
-            return False
-
-        lang = project_cache[project_id].iso_code
-        scripture_filename = f"{lang}-{project_id}"
-        scripture_related_tasks = [
-            t for t in tasks if has_scripture_file(t, scripture_filename)
-        ]
-
-    def has_project_id(task, project_id):
-        # ExtractTaskParams
-        if hasattr(task, "project_id") and task.project_id == project_id:
-            return True
-
-        # TranslateTaskParams
-        if hasattr(task, "source_project_id") and task.source_project_id == project_id:
-            return True
-
-        return False
-
-    project_related_tasks = [t for t in tasks if has_project_id(t, project_id)]
-
-    all_related_tasks = scripture_related_tasks + project_related_tasks
-    return all_related_tasks
 
 
 @router.get("/", response_model=List[Task])
@@ -381,7 +345,16 @@ async def read_tasks(
     Retrieve a list of all tasks.
     """
 
-    tasks = get_project_specific_tasks(project_id) if project_id else get_all_tasks()
+    if project_id:
+        project = project_cache.get(project_id)
+        if project is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Project with ID {project_id} not found.",
+            )
+        tasks = project.tasks
+    else:
+        tasks = get_all_tasks()
 
     return tasks[skip : skip + limit]
 
