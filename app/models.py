@@ -3,8 +3,6 @@ from enum import Enum
 from typing import List, Optional, Dict, Any, Union
 from pydantic import BaseModel, Field
 
-from app.state import tasks_cache
-
 # --- Enums ---
 
 
