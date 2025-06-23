@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Query, status
 import yaml
+import csv
 
 from app.constants import EXPERIMENTS_DIR
 from app.state import tasks_cache
@@ -117,12 +118,26 @@ def load_experiment_from_path(experiment_path: Path) -> Optional[Task]:
             raise Exception(
                 f"Could not get sources and target for alignment from config.yml at {experiment_path}"
             )
+
+        # Check for results in ./corpus_stats.csv
+        results = []
+        corpus_stats_file = experiment_path / "corpus_stats.csv"
+        if corpus_stats_file.is_file():
+            with open(corpus_stats_file, "r") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    results.append(row)
+        if not results:
+            results = None
+
         params = AlignTaskParams(
             target_scripture_file=target,
             source_scripture_files=sources,
+            results=results,
         )
         kind = TaskKind.ALIGN
     else:
+        # It's a train task
         target = config_data.get("corpus_pairs", [])[0].get("trg", "")
         sources = config_data.get("corpus_pairs", [])[0].get("src")
         training_corpus = config_data.get("corpus_pairs", [])[0].get(
@@ -142,6 +157,15 @@ def load_experiment_from_path(experiment_path: Path) -> Optional[Task]:
         if isinstance(sources, str):
             sources = [sources]
 
+        # Glob for results in files like ./scores-5000.csv
+        results = {}
+        for results_file in experiment_path.glob("results/scores-*.csv"):
+            if results_file.is_file():
+                with open(results_file, "r") as f:
+                    results[results_file.name] = f.read()
+        if not results:
+            results = None
+
         # This is what silnlp will want for translate tasks
         experiment_name = "/".join(str(experiment_path).split("/")[-2:])
         params = TrainTaskParams(
@@ -150,13 +174,14 @@ def load_experiment_from_path(experiment_path: Path) -> Optional[Task]:
             source_scripture_files=sources,
             training_corpus=training_corpus,
             lang_codes=lang_codes,
+            results=results,
         )
         kind = TaskKind.TRAIN
 
     return Task(
         id=str(uuid.uuid4()),
         kind=kind,
-        status=TaskStatus.COMPLETED,
+        status=TaskStatus.COMPLETED if params.results else TaskStatus.UNKNOWN,
         created_at=config_file_created_at,
         started_at=None,
         ended_at=None,

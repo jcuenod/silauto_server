@@ -19,6 +19,7 @@ class TaskStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
+    UNKNOWN = "unknown"
 
 
 # --- Base Models ---
@@ -58,6 +59,7 @@ class ParatextProject(BaseModel):
 class AlignTaskParams(BaseModel):
     target_scripture_file: str
     source_scripture_files: List[str]
+    results: Optional[List[Dict[str, str]]]
 
 
 class TrainTaskParams(BaseModel):
@@ -69,6 +71,7 @@ class TrainTaskParams(BaseModel):
         description="List of book identifiers (e.g., 'NT', or 'MAT', 'MRK') to use for training",
     )
     lang_codes: Dict[str, str]
+    results: Optional[Dict[str, Dict[str, str]]]
     # config yml?
     # other settings...
 
