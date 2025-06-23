@@ -342,17 +342,19 @@ def get_project_specific_tasks(project_id):
     # let's get the likely scripture file name based on the project's id
     scripture_related_tasks = []
     if project_id in project_cache:
-        lang = project_cache[project_id].iso_code
-        scripture_file_name = f"{lang}-{project_id}"
 
-        def has_scripture_file(task: Task):
+        def has_scripture_file(task: Task, scripture_filename):
             if task.kind == TaskKind.ALIGN or task.kind == TaskKind.TRAIN:
-                return task.parameters.target_scripture_file == scripture_file_name  # type: ignore (that's why we have the taskkind guard)
+                return task.parameters.target_scripture_file == scripture_filename  # type: ignore (that's why we have the taskkind guard)
             return False
 
-        scripture_related_tasks = [t for t in tasks if has_scripture_file(t)]
+        lang = project_cache[project_id].iso_code
+        scripture_filename = f"{lang}-{project_id}"
+        scripture_related_tasks = [
+            t for t in tasks if has_scripture_file(t, scripture_filename)
+        ]
 
-    def has_project_id(task):
+    def has_project_id(task, project_id):
         # ExtractTaskParams
         if hasattr(task, "project_id") and task.project_id == project_id:
             return True
@@ -363,7 +365,7 @@ def get_project_specific_tasks(project_id):
 
         return False
 
-    project_related_tasks = [t for t in tasks if has_project_id(t)]
+    project_related_tasks = [t for t in tasks if has_project_id(t, project_id)]
 
     all_related_tasks = scripture_related_tasks + project_related_tasks
     return all_related_tasks

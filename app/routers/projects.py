@@ -54,7 +54,7 @@ def parse_settings_xml(file_path: Path) -> Optional[Dict[str, str]]:
                 "lang": language_element.text
                 if language_element is not None and language_element.text
                 else "",
-                "iso_code": iso_code_element.text,
+                "iso_code": iso_code_element.text.split(":")[0],
             }
         else:
             # Log warning or handle missing elements if needed
