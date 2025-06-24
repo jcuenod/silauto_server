@@ -6,3 +6,4 @@ tasks_cache: Dict[str, Task] = {}
 project_cache: Dict[str, ParatextProject] = {}
 scripture_cache: Dict[str, Scripture] = {}
 translation_cache: List[Draft] = []
+lang_codes_cache: Dict[str, List[str]] = {}

@@ -8,7 +8,7 @@ import yaml
 import csv
 
 from app.constants import EXPERIMENTS_DIR
-from app.state import tasks_cache
+from app.state import tasks_cache, lang_codes_cache
 
 # Updated model imports
 from app.models import (
@@ -144,6 +144,14 @@ def load_experiment_from_path(experiment_path: Path) -> Optional[Task]:
             "corpus_books", None
         )
         lang_codes = config_data.get("lang_codes", {})
+
+        # Go through each kv pair and check that all the values are included in the lang_codes_cache
+        for code, name in lang_codes.items():
+            if code not in lang_codes_cache:
+                lang_codes_cache[code] = []
+
+            if name not in lang_codes_cache[code]:
+                lang_codes_cache[code].append(name)
 
         # Training corpus is not required, but the other fields are...
         if not target or not sources or not lang_codes:
