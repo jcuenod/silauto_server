@@ -41,8 +41,11 @@ async def _process_translation_file(f):
 
         target_project_id = target_project.split("-")[-1]
 
+        # the last two parts of config_file_path are the experiment name
+        experiment_name = "/".join(str(config_file_path).split("/")[-2:])
         translation = Draft(
             project_id=target_project_id,
+            train_experiment_name=experiment_name,
             source_scripture_name=f.parent.name,
             # name without the leading digits and without the .SFM extension
             book_name=f.name[2:].split(".")[0],
@@ -58,11 +61,11 @@ async def scan():
     Asynchronously scans the SILNLP_DATA/MT/experiments directory for .SFM files in `infer/` subdirectories.
     """
     global translation_cache
+    translation_cache = []
     print(f"Scanning {EXPERIMENTS_DIR} for translations...")
 
     if not EXPERIMENTS_DIR.is_dir():
         print(f"Warning: Experiments directory '{EXPERIMENTS_DIR}' not found.")
-        translation_cache = []
         return
 
     # Get all SFM files first

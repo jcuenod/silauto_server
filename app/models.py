@@ -139,5 +139,6 @@ class Scripture(BaseModel):
 
 class Draft(BaseModel):
     project_id: str
+    train_experiment_name: str
     source_scripture_name: str
     book_name: str
