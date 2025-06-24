@@ -108,7 +108,6 @@ def load_experiment_from_path(experiment_path: Path) -> Optional[Task]:
         print(f"Warning: Failed to parse config.yml in {experiment_path}")
         return None
 
-    print(experiment_path)
     kind: TaskKind
     params: TaskParams
     if config_data.get("aligner", None):
@@ -161,9 +160,7 @@ def load_experiment_from_path(experiment_path: Path) -> Optional[Task]:
         # Glob for results in files like ./scores-5000.csv
         results = {}
         for results_file in experiment_path.glob("scores-*.csv"):
-            print(results_file.name)
             with open(results_file, "r") as f:
-                print(results_file.name)
                 reader = csv.DictReader(f)
                 # results[results_file.name] = reader.__next__()
                 for row in reader:
