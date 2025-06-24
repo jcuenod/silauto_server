@@ -170,14 +170,29 @@ async def create_project(
     Requires a 'Settings.xml' file within the upload to define project metadata.
     Files will be stored in a unique directory under the configured PARATEXT_PROJECTS_DIR.
     """
-    project_id = str(uuid.uuid4())
+    if not files or len(files) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No files uploaded. At least 'Settings.xml' is required.",
+        )
+
+    first_file = files[0]
+    if not first_file.filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="First uploaded file has no filename.",
+        )
+
+    date = datetime.now().strftime("%Y-%m-%d")
+
+    project_id = first_file.filename.split("/")[0] + f"-{date}"
     project_path = PARATEXT_PROJECTS_DIR / project_id
     print(f"Creating project directory at: {project_path}")
 
     try:
         project_path.mkdir(parents=True, exist_ok=False)
     except FileExistsError:
-        # Extremely unlikely with UUIDs, but handle defensively
+        # Unlikely, but handle defensively
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create unique project directory.",
