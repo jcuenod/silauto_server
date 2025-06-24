@@ -41,8 +41,8 @@ async def _process_translation_file(f):
 
         target_project_id = target_project.split("-")[-1]
 
-        # the last two parts of config_file_path are the experiment name
-        experiment_name = "/".join(str(config_file_path).split("/")[-2:])
+        # the last two parts of the parent folder of config_file_path are the experiment name
+        experiment_name = "/".join(str(config_file_path.parent).split("/")[-2:])
         translation = Draft(
             project_id=target_project_id,
             train_experiment_name=experiment_name,
