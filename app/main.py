@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import routers
-from app.routers import drafts, projects, tasks, scriptures
+from app.routers import drafts, projects, tasks, scriptures, lang_codes
 
 # Import configuration
 from app.config import (
@@ -34,6 +34,7 @@ app.include_router(projects.router)
 app.include_router(tasks.router)
 app.include_router(scriptures.router)
 app.include_router(drafts.router)
+app.include_router(lang_codes.router)
 
 
 @app.get("/", tags=["Root"])
