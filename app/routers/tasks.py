@@ -357,7 +357,12 @@ async def create_translate_task(params: TranslateTaskParams):
     return db_task
 
 
-# @router.post("/extract_task", response_model=Task, status_code=status.HTTP_201_CREATED, summary="Create Extraction Task")
+@router.post(
+    "/extract_task",
+    response_model=Task,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create Extraction Task",
+)
 async def create_extract_task(params: ExtractTaskParams):
     """
     Create a new **Extraction** task.
