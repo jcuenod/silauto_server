@@ -65,6 +65,10 @@ def _validate_scripture_exists(scripture_file: str):
     return scripture_file in scripture_cache
 
 
+def _get_invalid_scripture_files(scripture_file_list: list[str]):
+    return [f for f in scripture_file_list if not _validate_scripture_exists(f)]
+
+
 # --- Helper Function for Task Validation ---
 def _validate_task_exists(
     task_id: str,
@@ -245,14 +249,9 @@ async def create_align_task(params: CreateAlignTaskParams):
     Requires valid target and source project IDs.
     """
 
-    invalid_scripture_files = [
-        f
-        for f in params.source_scripture_files
-        if not _validate_scripture_exists(params.target_scripture_file)
-    ]
-    if not _validate_scripture_exists(params.target_scripture_file):
-        invalid_scripture_files.append(params.target_scripture_file)
-
+    invalid_scripture_files = _get_invalid_scripture_files(
+        [params.target_scripture_file, *params.source_scripture_files]
+    )
     if len(invalid_scripture_files) > 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -289,14 +288,9 @@ async def create_train_task(params: CreateTrainTaskParams):
     Requires valid target and source project IDs.
     """
 
-    invalid_scripture_files = [
-        f
-        for f in params.source_scripture_files
-        if not _validate_scripture_exists(params.target_scripture_file)
-    ]
-    if not _validate_scripture_exists(params.target_scripture_file):
-        invalid_scripture_files.append(params.target_scripture_file)
-
+    invalid_scripture_files = _get_invalid_scripture_files(
+        [params.target_scripture_file, *params.source_scripture_files]
+    )
     if len(invalid_scripture_files) > 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

@@ -28,11 +28,15 @@ async def _process_scripture_file(file_path: Path) -> Optional[Scripture]:
     try:
         # Run the potentially blocking Vref call in a separate thread
         file_path_str = str(file_path)
-        lang_code, id_with_extension = file_path.name.split("-", 1)
-        id = id_with_extension[:-4]
+        id = file_path.name[:-4]
+        lang_code, name = id.split("-", 1)
         vref_stats = await asyncio.to_thread(_create_vref_and_get_stats, file_path_str)
         return Scripture(
-            id=id, lang_code=lang_code, path=str(file_path.resolve()), stats=vref_stats
+            id=id,
+            name=name,
+            lang_code=lang_code,
+            path=str(file_path.resolve()),
+            stats=vref_stats,
         )
     except Exception as e:
         print(f"Error processing scripture file {file_path.name}: {e}")

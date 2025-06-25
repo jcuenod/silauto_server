@@ -137,6 +137,7 @@ class Task(BaseModel):
 
 class Scripture(BaseModel):
     id: str
+    name: str
     lang_code: str
     path: str
     stats: Dict[str, Any]
