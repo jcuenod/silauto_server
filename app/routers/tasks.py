@@ -423,6 +423,25 @@ async def read_task(task_id: str):
     return db_task
 
 
+@router.get("/next", response_model=Task)
+async def read_next_queued_task(task_id: str):
+    """
+    Retrieve the next queued task.
+    """
+    next_queued = None
+    for t in tasks_cache.values():
+        if t.status == TaskStatus.QUEUED:
+            if next_queued is None or t.created_at < next_queued.created_at:
+                next_queued = t
+
+    if next_queued is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
+        )
+
+    return next_queued
+
+
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_task(task_id: str):
     """

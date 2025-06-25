@@ -54,7 +54,7 @@ async def scan():
 
     if not SCRIPTURE_DIR.is_dir():
         print(f"Warning: Scripture directory '{SCRIPTURE_DIR}' not found.")
-        scripture_cache = {}
+        scripture_cache.clear()
         return
 
     file_paths = [fp for fp in SCRIPTURE_DIR.glob("*.txt") if fp.is_file()]
@@ -62,7 +62,7 @@ async def scan():
 
     if total_files == 0:
         print("No scripture files found.")
-        scripture_cache = {}
+        scripture_cache.clear()
         return
 
     print(f"Found {total_files} scripture files to process...")
@@ -89,7 +89,7 @@ async def scan():
 
     # Sort by name for consistent ordering
     sorted_names = sorted(processed_scriptures.keys())
-    scripture_cache = {name: processed_scriptures[name] for name in sorted_names}
+    scripture_cache.update({name: processed_scriptures[name] for name in sorted_names})
     print(f"Scripture scan complete. Found {len(scripture_cache)} files.")
 
 
