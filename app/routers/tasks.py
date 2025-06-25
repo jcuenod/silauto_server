@@ -12,6 +12,8 @@ from app.state import tasks_cache, lang_codes_cache
 
 # Updated model imports
 from app.models import (
+    CreateAlignTaskParams,
+    CreateTrainTaskParams,
     Task,
     TaskKind,
     TaskParams,
@@ -196,7 +198,6 @@ def load_experiment_from_path(experiment_path: Path) -> Optional[Task]:
         created_at=config_file_created_at,
         started_at=None,
         ended_at=None,
-        result=None,
         error=None,
         parameters=params,
     )
@@ -209,7 +210,7 @@ async def scan():
 
     if not EXPERIMENTS_DIR.is_dir():
         print(f"Warning: EXPERIMENTS_DIR '{EXPERIMENTS_DIR}' does not exist.")
-        tasks_cache = {}
+        tasks_cache.clear()
         return []
 
     def get_experiments() -> List[Task]:
@@ -224,7 +225,8 @@ async def scan():
         return found_experiments
 
     tasks_list = await asyncio.to_thread(get_experiments)
-    tasks_cache = {t.id: t for t in tasks_list}
+    tasks_cache.clear()
+    tasks_cache.update({t.id: t for t in tasks_list})
     print(f"Experiment scan complete. Found {len(tasks_list)} experiments.")
 
 
@@ -237,7 +239,7 @@ async def scan():
     status_code=status.HTTP_201_CREATED,
     summary="Create Alignment Task",
 )
-async def create_align_task(params: AlignTaskParams):
+async def create_align_task(params: CreateAlignTaskParams):
     """
     Create a new **Alignment** task.
     Requires valid target and source project IDs.
@@ -257,13 +259,19 @@ async def create_align_task(params: AlignTaskParams):
             detail=f"Some scripture files do not exist: {invalid_scripture_files}",
         )
 
+    task_parameters = AlignTaskParams(
+        target_scripture_file=params.target_scripture_file,
+        source_scripture_files=params.source_scripture_files,
+        results=None,
+    )
+
     task_id = str(uuid.uuid4())
     db_task = Task(
         id=task_id,
         kind=TaskKind.ALIGN,
         status=TaskStatus.QUEUED,
         created_at=datetime.now(timezone.utc),
-        parameters=params,
+        parameters=task_parameters,
     )
     tasks_cache[task_id] = db_task
     return db_task
@@ -275,7 +283,7 @@ async def create_align_task(params: AlignTaskParams):
     status_code=status.HTTP_201_CREATED,
     summary="Create Training Task",
 )
-async def create_train_task(params: TrainTaskParams):
+async def create_train_task(params: CreateTrainTaskParams):
     """
     Create a new **Training** task.
     Requires valid target and source project IDs.
@@ -295,13 +303,22 @@ async def create_train_task(params: TrainTaskParams):
             detail=f"Some scripture files do not exist: {invalid_scripture_files}",
         )
 
+    task_parameters = TrainTaskParams(
+        target_scripture_file=params.target_scripture_file,
+        experiment_name=params.experiment_name,
+        source_scripture_files=params.source_scripture_files,
+        training_corpus=params.training_corpus,
+        lang_codes=params.lang_codes,
+        results=None,
+    )
+
     task_id = str(uuid.uuid4())
     db_task = Task(
         id=task_id,
         kind=TaskKind.TRAIN,
         status=TaskStatus.QUEUED,
         created_at=datetime.now(timezone.utc),
-        parameters=params,
+        parameters=task_parameters,
     )
     tasks_cache[task_id] = db_task
     return db_task

@@ -56,13 +56,16 @@ class ParatextProject(BaseModel):
 
 
 # Base for tasks needing target and source(s)
-class AlignTaskParams(BaseModel):
+class CreateAlignTaskParams(BaseModel):
     target_scripture_file: str
     source_scripture_files: List[str]
+
+
+class AlignTaskParams(CreateAlignTaskParams):
     results: Optional[List[Dict[str, str]]]
 
 
-class TrainTaskParams(BaseModel):
+class CreateTrainTaskParams(BaseModel):
     target_scripture_file: str
     experiment_name: str
     source_scripture_files: List[str]
@@ -71,6 +74,9 @@ class TrainTaskParams(BaseModel):
         description="List of book identifiers (e.g., 'NT', or 'MAT', 'MRK') to use for training",
     )
     lang_codes: Dict[str, str]
+
+
+class TrainTaskParams(CreateTrainTaskParams):
     results: Optional[Dict[str, Dict[str, Any]]]
     # config yml?
     # other settings...
@@ -111,7 +117,6 @@ class Task(BaseModel):
     created_at: datetime
     started_at: Optional[datetime] = None
     ended_at: Optional[datetime] = None
-    result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
     parameters: TaskParams
 
