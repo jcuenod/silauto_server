@@ -57,11 +57,13 @@ class ParatextProject(BaseModel):
 
 # Base for tasks needing target and source(s)
 class CreateAlignTaskParams(BaseModel):
+    project_id: str
     target_scripture_file: str
     source_scripture_files: List[str]
 
 
 class AlignTaskParams(CreateAlignTaskParams):
+    experiment_name: str
     results: Optional[List[Dict[str, str]]]
 
 
@@ -77,12 +79,14 @@ class CreateTrainTaskParams(BaseModel):
 
 
 class TrainTaskParams(CreateTrainTaskParams):
+    experiment_name: str
     results: Optional[Dict[str, Dict[str, Any]]]
     # config yml?
     # other settings...
 
 
 class TranslateTaskParams(BaseModel):
+    experiment_name: str
     train_task_id: str = Field(
         ...,
         description="Reference to the completed training task (from this we get the target project)",

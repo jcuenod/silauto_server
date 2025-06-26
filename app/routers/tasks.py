@@ -25,6 +25,7 @@ from app.models import (
 )
 
 from app.state import scripture_cache, project_cache
+from app.templates.align import create_align_config_for
 
 router = APIRouter(
     prefix="/tasks",
@@ -113,6 +114,8 @@ def load_experiment_from_path(experiment_path: Path) -> Optional[Task]:
         print(f"Warning: Failed to parse config.yml in {experiment_path}")
         return None
 
+    experiment_name = "/".join(str(experiment_path).split("/")[-2:])
+
     kind: TaskKind
     params: TaskParams
     if config_data.get("aligner", None):
@@ -136,8 +139,10 @@ def load_experiment_from_path(experiment_path: Path) -> Optional[Task]:
             results = None
 
         params = AlignTaskParams(
+            project_id=str(experiment_path).split("/")[-2],
             target_scripture_file=target,
             source_scripture_files=sources,
+            experiment_name=experiment_name,
             results=results,
         )
         kind = TaskKind.ALIGN
@@ -183,7 +188,6 @@ def load_experiment_from_path(experiment_path: Path) -> Optional[Task]:
             results = None
 
         # This is what silnlp will want for translate tasks
-        experiment_name = "/".join(str(experiment_path).split("/")[-2:])
         params = TrainTaskParams(
             experiment_name=experiment_name,
             target_scripture_file=target,
@@ -257,7 +261,13 @@ async def create_align_task(params: CreateAlignTaskParams):
             detail=f"Some scripture files do not exist: {invalid_scripture_files}",
         )
 
+    experiment_name = create_align_config_for(
+        params.project_id, params.target_scripture_file, params.source_scripture_files
+    )
+
     task_parameters = AlignTaskParams(
+        project_id=params.project_id,
+        experiment_name=experiment_name,
         target_scripture_file=params.target_scripture_file,
         source_scripture_files=params.source_scripture_files,
         results=None,
@@ -461,14 +471,28 @@ async def update_task_status(task_id: str, status_update: TaskStatusUpdate):
 
     if status_update.status == TaskStatus.RUNNING and db_task.started_at is None:
         db_task.started_at = current_time
+
     elif status_update.status in [
-        TaskStatus.COMPLETED,
         TaskStatus.FAILED,
         TaskStatus.CANCELLED,
+        TaskStatus.COMPLETED,
     ]:
         if db_task.started_at is None:
             db_task.started_at = current_time
         db_task.ended_at = current_time
+
+    if status_update.status == TaskStatus.COMPLETED and db_task.kind in [
+        TaskKind.ALIGN,
+        TaskKind.TRAIN,
+    ]:
+        exp_name = db_task.parameters.experiment_name  # type: ignore
+        updated_task = None
+        if exp_name:
+            updated_task = load_experiment_from_path(EXPERIMENTS_DIR / exp_name)
+
+        if updated_task:
+            updated_task.ended_at = current_time
+            tasks_cache.update({task_id: updated_task})
 
     # Update error message if provided
     if status_update.error:
