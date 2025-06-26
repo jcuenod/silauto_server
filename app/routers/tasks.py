@@ -10,7 +10,6 @@ import csv
 from app.constants import EXPERIMENTS_DIR
 from app.state import tasks_cache, lang_codes_cache
 
-# Updated model imports
 from app.models import (
     CreateAlignTaskParams,
     CreateTrainTaskParams,
@@ -18,13 +17,13 @@ from app.models import (
     TaskKind,
     TaskParams,
     TaskStatus,
+    TaskStatusUpdate,
     AlignTaskParams,
     TrainTaskParams,
     TranslateTaskParams,
-    ExtractTaskParams,  # Added ExtractTaskCreate
+    ExtractTaskParams,
 )
 
-# Import project cache and helper instead of filesystem functions directly
 from app.state import scripture_cache, project_cache
 
 router = APIRouter(
@@ -415,6 +414,75 @@ async def read_tasks(
     return tasks[skip : skip + limit]
 
 
+@router.get("/next", response_model=Task)
+async def read_next_queued_task():
+    """
+    Retrieve the next queued task.
+    """
+    next_queued = None
+    print(next_queued)
+    for t in tasks_cache.values():
+        if t.status == TaskStatus.QUEUED:
+            print(t)
+            if next_queued is None or t.created_at < next_queued.created_at:
+                print("this is older!")
+                next_queued = t
+
+    if next_queued is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
+        )
+
+    return next_queued
+
+
+@router.patch("/{task_id}/status", response_model=Task)
+async def update_task_status(task_id: str, status_update: TaskStatusUpdate):
+    """
+    Update the status of a task.
+
+    - **QUEUED**: Task is waiting to be processed
+    - **RUNNING**: Task is currently being processed
+    - **COMPLETED**: Task finished successfully
+    - **FAILED**: Task failed with an error
+    - **CANCELLED**: Task was cancelled
+    """
+    db_task = tasks_cache.get(task_id)
+    if db_task is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
+        )
+
+    # Update the status
+    db_task.status = status_update.status
+
+    # Update timestamps based on status
+    current_time = datetime.now(timezone.utc)
+
+    if status_update.status == TaskStatus.RUNNING and db_task.started_at is None:
+        db_task.started_at = current_time
+    elif status_update.status in [
+        TaskStatus.COMPLETED,
+        TaskStatus.FAILED,
+        TaskStatus.CANCELLED,
+    ]:
+        if db_task.started_at is None:
+            db_task.started_at = current_time
+        db_task.ended_at = current_time
+
+    # Update error message if provided
+    if status_update.error:
+        db_task.error = status_update.error
+    elif status_update.status == TaskStatus.COMPLETED:
+        # Clear error on successful completion
+        db_task.error = None
+
+    # Update the cache
+    tasks_cache[task_id] = db_task
+
+    return db_task
+
+
 @router.get("/{task_id}", response_model=Task)
 async def read_task(task_id: str):
     """
@@ -426,25 +494,6 @@ async def read_task(task_id: str):
             status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
         )
     return db_task
-
-
-@router.get("/next", response_model=Task)
-async def read_next_queued_task(task_id: str):
-    """
-    Retrieve the next queued task.
-    """
-    next_queued = None
-    for t in tasks_cache.values():
-        if t.status == TaskStatus.QUEUED:
-            if next_queued is None or t.created_at < next_queued.created_at:
-                next_queued = t
-
-    if next_queued is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
-        )
-
-    return next_queued
 
 
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)

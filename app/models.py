@@ -135,6 +135,11 @@ class Task(BaseModel):
         return False
 
 
+class TaskStatusUpdate(BaseModel):
+    status: TaskStatus
+    error: Optional[str] = None
+
+
 class Scripture(BaseModel):
     id: str
     name: str
