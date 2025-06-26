@@ -3,16 +3,15 @@ from datetime import datetime
 
 
 def get_align_config(target_scripture_file, source_scripture_files):
-    align_source = target_scripture_file
-    align_targets = "\n".join(["    - " + t for t in source_scripture_files]).strip()
+    align_sources = "\n".join(["    - " + t for t in source_scripture_files]).strip()
 
     return f"""data:
   aligner: fast_align
   corpus_pairs:
   - type: train
-    src: {align_source}
-    trg:
-    {align_targets}
+    trg: {target_scripture_file}
+    src:
+    {align_sources}
     mapping: many_to_many
     test_size: 0
     val_size: 0
