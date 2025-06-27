@@ -68,8 +68,8 @@ class AlignTaskParams(CreateAlignTaskParams):
 
 
 class CreateTrainTaskParams(BaseModel):
+    project_id: str
     target_scripture_file: str
-    experiment_name: str
     source_scripture_files: List[str]
     training_corpus: Optional[str] = Field(
         ...,

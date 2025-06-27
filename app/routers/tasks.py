@@ -26,6 +26,7 @@ from app.models import (
 
 from app.state import scripture_cache, project_cache
 from app.templates.align import create_align_config_for
+from app.templates.train import create_train_config_for
 
 router = APIRouter(
     prefix="/tasks",
@@ -114,6 +115,7 @@ def load_experiment_from_path(experiment_path: Path) -> Optional[Task]:
         print(f"Warning: Failed to parse config.yml in {experiment_path}")
         return None
 
+    project_id = str(experiment_path).split("/")[-2]
     experiment_name = "/".join(str(experiment_path).split("/")[-2:])
 
     kind: TaskKind
@@ -139,7 +141,7 @@ def load_experiment_from_path(experiment_path: Path) -> Optional[Task]:
             results = None
 
         params = AlignTaskParams(
-            project_id=str(experiment_path).split("/")[-2],
+            project_id=project_id,
             target_scripture_file=target,
             source_scripture_files=sources,
             experiment_name=experiment_name,
@@ -189,6 +191,7 @@ def load_experiment_from_path(experiment_path: Path) -> Optional[Task]:
 
         # This is what silnlp will want for translate tasks
         params = TrainTaskParams(
+            project_id=project_id,
             experiment_name=experiment_name,
             target_scripture_file=target,
             source_scripture_files=sources,
@@ -306,9 +309,18 @@ async def create_train_task(params: CreateTrainTaskParams):
             detail=f"Some scripture files do not exist: {invalid_scripture_files}",
         )
 
+    experiment_name = create_train_config_for(
+        params.project_id,
+        params.target_scripture_file,
+        params.source_scripture_files,
+        params.lang_codes,
+        params.training_corpus,
+    )
+
     task_parameters = TrainTaskParams(
+        project_id=params.project_id,
         target_scripture_file=params.target_scripture_file,
-        experiment_name=params.experiment_name,
+        experiment_name=experiment_name,
         source_scripture_files=params.source_scripture_files,
         training_corpus=params.training_corpus,
         lang_codes=params.lang_codes,

@@ -31,7 +31,7 @@ def create_align_config_for(project_id, target_scripture_file, source_scripture_
     align_folder = os.path.join(base_folder, align_folder_name)
 
     suffix = 1
-    while os.path.exists(align_folder):
+    while not os.path.exists(align_folder):
         align_folder = os.path.join(base_folder, f"{align_folder_name}-{suffix}")
         suffix += 1
 
