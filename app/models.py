@@ -69,7 +69,6 @@ class AlignTaskParams(CreateAlignTaskParams):
 
 class CreateTrainTaskParams(BaseModel):
     project_id: str
-    target_scripture_file: str
     source_scripture_files: List[str]
     training_corpus: Optional[str] = Field(
         ...,
@@ -80,6 +79,7 @@ class CreateTrainTaskParams(BaseModel):
 
 class TrainTaskParams(CreateTrainTaskParams):
     experiment_name: str
+    target_scripture_file: str
     results: Optional[Dict[str, Dict[str, Any]]]
     # config yml?
     # other settings...

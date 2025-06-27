@@ -300,8 +300,10 @@ async def create_train_task(params: CreateTrainTaskParams):
     Requires valid target and source project IDs.
     """
 
+    project = project_cache[params.project_id]
+
     invalid_scripture_files = _get_invalid_scripture_files(
-        [params.target_scripture_file, *params.source_scripture_files]
+        [project.scripture_filename, *params.source_scripture_files]
     )
     if len(invalid_scripture_files) > 0:
         raise HTTPException(
@@ -311,7 +313,7 @@ async def create_train_task(params: CreateTrainTaskParams):
 
     experiment_name = create_train_config_for(
         params.project_id,
-        params.target_scripture_file,
+        project.scripture_filename,
         params.source_scripture_files,
         params.lang_codes,
         params.training_corpus,
@@ -319,7 +321,7 @@ async def create_train_task(params: CreateTrainTaskParams):
 
     task_parameters = TrainTaskParams(
         project_id=params.project_id,
-        target_scripture_file=params.target_scripture_file,
+        target_scripture_file=project.scripture_filename,
         experiment_name=experiment_name,
         source_scripture_files=params.source_scripture_files,
         training_corpus=params.training_corpus,
