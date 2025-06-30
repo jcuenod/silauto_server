@@ -26,12 +26,14 @@ def create_align_config_for(project_id, target_scripture_file, source_scripture_
     today_str = datetime.now().strftime("%y%m%d")
     base_folder = os.path.join(EXPERIMENTS_DIR, project_id)
     align_folder_name = f"align-{today_str}"
+    experiment_name = align_folder_name
     align_folder = os.path.join(base_folder, align_folder_name)
 
     suffix = 1
     while os.path.exists(align_folder):
-        align_folder = os.path.join(base_folder, f"{align_folder_name}-{suffix}")
         suffix += 1
+        experiment_name = f"{align_folder_name}-{suffix}"
+        align_folder = os.path.join(base_folder, experiment_name)
 
     os.makedirs(align_folder, exist_ok=True)
 
@@ -39,5 +41,5 @@ def create_align_config_for(project_id, target_scripture_file, source_scripture_
     with open(config_path, "w") as f:
         f.write(get_align_config(target_scripture_file, source_scripture_files))
 
-    experiment_name = f"{project_id}/{align_folder_name}-{suffix}"
-    return experiment_name
+    full_experiment_name = f"{project_id}/{experiment_name}"
+    return full_experiment_name
