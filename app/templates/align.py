@@ -1,5 +1,6 @@
 import os
 from datetime import datetime
+from app.constants import EXPERIMENTS_DIR
 
 
 def get_align_config(target_scripture_file, source_scripture_files):
@@ -20,13 +21,10 @@ def get_align_config(target_scripture_file, source_scripture_files):
 
 
 def create_align_config_for(project_id, target_scripture_file, source_scripture_files):
-    # check for folder like SILNLP_EXPERIMENTS_ROOT / project_id / {"align-" yymmdd} (and append "-1" or "-2" if that folder exists)
+    # check for folder like EXPERIMENTS_DIR / project_id / {"align-" yymmdd} (and append "-1" or "-2" if that folder exists)
     # then create config.yml in that folder using get_align_config
-    SILNLP_EXPERIMENTS_ROOT = os.environ.get(
-        "SILNLP_EXPERIMENTS_ROOT", "/tmp/silnlp_experiments"
-    )
     today_str = datetime.now().strftime("%y%m%d")
-    base_folder = os.path.join(SILNLP_EXPERIMENTS_ROOT, project_id)
+    base_folder = os.path.join(EXPERIMENTS_DIR, project_id)
     align_folder_name = f"align-{today_str}"
     align_folder = os.path.join(base_folder, align_folder_name)
 
