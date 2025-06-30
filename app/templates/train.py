@@ -1,5 +1,6 @@
 import os
 from typing import List, Dict, Optional
+from constants import EXPERIMENTS_DIR
 
 
 def get_train_config(
@@ -84,10 +85,7 @@ def create_train_config_for(
     if len(source_scripture_files) == 0:
         raise Exception("No source scripture files specified")
 
-    SILNLP_EXPERIMENTS_ROOT = os.environ.get(
-        "SILNLP_EXPERIMENTS_ROOT", "/tmp/silnlp_experiments"
-    )
-    base_folder = os.path.join(SILNLP_EXPERIMENTS_ROOT, project_id)
+    base_folder = os.path.join(EXPERIMENTS_DIR, project_id)
     train_folder_name = (
         source_scripture_files[0].split("-", 1)[-1]
         if len(source_scripture_files) == 1
