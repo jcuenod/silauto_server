@@ -477,47 +477,45 @@ async def update_task_status(task_id: str, status_update: TaskStatusUpdate):
             status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
         )
 
-    # Update the status
-    db_task.status = status_update.status
-
-    # Update timestamps based on status
     current_time = datetime.now(timezone.utc)
 
-    if status_update.status == TaskStatus.RUNNING and db_task.started_at is None:
-        db_task.started_at = current_time
-
-    elif status_update.status in [
-        TaskStatus.FAILED,
-        TaskStatus.CANCELLED,
-        TaskStatus.COMPLETED,
-    ]:
-        if db_task.started_at is None:
-            db_task.started_at = current_time
-        db_task.ended_at = current_time
-
-    if status_update.status == TaskStatus.COMPLETED and db_task.kind in [
-        TaskKind.ALIGN,
-        TaskKind.TRAIN,
-    ]:
+    # Special handling for completed align/train tasks - reload from experiment
+    if (status_update.status == TaskStatus.COMPLETED and 
+        db_task.kind in [TaskKind.ALIGN, TaskKind.TRAIN]):
+        
         exp_name = db_task.parameters.experiment_name  # type: ignore
-        updated_task = None
         if exp_name:
             updated_task = load_experiment_from_path(EXPERIMENTS_DIR / exp_name)
-
-        if updated_task:
-            updated_task.ended_at = current_time
-            tasks_cache.update({task_id: updated_task})
-
-    # Update error message if provided
+            if updated_task:
+                # Preserve the timing information we just set
+                updated_task.started_at = db_task.started_at
+                updated_task.ended_at = current_time
+                updated_task.status = TaskStatus.COMPLETED
+                updated_task.error = None
+                
+                # Use the updated task with fresh experiment data
+                tasks_cache[task_id] = updated_task
+                return updated_task
+    
+    
+    # Update basic task properties
+    db_task.status = status_update.status
+    
+    # Handle error messages
     if status_update.error:
         db_task.error = status_update.error
     elif status_update.status == TaskStatus.COMPLETED:
         # Clear error on successful completion
         db_task.error = None
-
+    
+    # Update timestamps based on status
+    if status_update.status == TaskStatus.RUNNING and db_task.started_at is None:
+        db_task.started_at = current_time
+    elif status_update.status in [TaskStatus.FAILED, TaskStatus.CANCELLED, TaskStatus.COMPLETED]:
+        db_task.ended_at = current_time
+    
     # Update the cache
     tasks_cache[task_id] = db_task
-
     return db_task
 
 
