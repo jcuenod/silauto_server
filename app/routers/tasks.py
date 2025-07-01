@@ -123,7 +123,9 @@ def load_experiment_from_path(experiment_path: Path) -> Optional[Task]:
     if config_data.get("aligner", None):
         # It's an align task
         sources = config_data.get("corpus_pairs", [])[0].get("src", [])
-        target = config_data.get("corpus_pairs", [])[0].get("trg", [])[0]
+        maybe_array_of_targets = config_data.get("corpus_pairs", [])[0].get("trg", [])
+        target = maybe_array_of_targets[0] if isinstance(maybe_array_of_targets, list) else maybe_array_of_targets
+
         if len(sources) == 0 or not target:
             raise Exception(
                 f"Could not get sources and target for alignment from config.yml at {experiment_path}"
@@ -444,12 +446,10 @@ async def read_next_queued_task():
     Retrieve the next queued task.
     """
     next_queued = None
-    print(next_queued)
     for t in tasks_cache.values():
         if t.status == TaskStatus.QUEUED:
             print(t)
             if next_queued is None or t.created_at < next_queued.created_at:
-                print("this is older!")
                 next_queued = t
 
     if next_queued is None:
@@ -479,25 +479,6 @@ async def update_task_status(task_id: str, status_update: TaskStatusUpdate):
 
     current_time = datetime.now(timezone.utc)
 
-    # Special handling for completed align/train tasks - reload from experiment
-    if (status_update.status == TaskStatus.COMPLETED and 
-        db_task.kind in [TaskKind.ALIGN, TaskKind.TRAIN]):
-        
-        exp_name = db_task.parameters.experiment_name  # type: ignore
-        if exp_name:
-            updated_task = load_experiment_from_path(EXPERIMENTS_DIR / exp_name)
-            if updated_task:
-                # Preserve the timing information we just set
-                updated_task.started_at = db_task.started_at
-                updated_task.ended_at = current_time
-                updated_task.status = TaskStatus.COMPLETED
-                updated_task.error = None
-                
-                # Use the updated task with fresh experiment data
-                tasks_cache[task_id] = updated_task
-                return updated_task
-    
-    
     # Update basic task properties
     db_task.status = status_update.status
     
@@ -513,7 +494,19 @@ async def update_task_status(task_id: str, status_update: TaskStatusUpdate):
         db_task.started_at = current_time
     elif status_update.status in [TaskStatus.FAILED, TaskStatus.CANCELLED, TaskStatus.COMPLETED]:
         db_task.ended_at = current_time
-    
+
+    # Special handling for completed align/train tasks - reload from experiment
+    if (status_update.status == TaskStatus.COMPLETED and 
+        db_task.kind in [TaskKind.ALIGN, TaskKind.TRAIN]):
+        
+        exp_name = db_task.parameters.experiment_name  # type: ignore
+        if exp_name:
+            # All we care about is actually the results
+            updated_task = load_experiment_from_path(EXPERIMENTS_DIR / exp_name)
+            if updated_task:
+                # Update the original task with fresh experiment data, preserving the original ID
+                db_task.parameters = updated_task.parameters  # Get fresh results
+
     # Update the cache
     tasks_cache[task_id] = db_task
     return db_task
