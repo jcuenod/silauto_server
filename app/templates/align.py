@@ -21,18 +21,18 @@ def get_align_config(target_scripture_file, source_scripture_files):
 
 
 def create_align_config_for(project_id, target_scripture_file, source_scripture_files):
-    # check for folder like EXPERIMENTS_DIR / project_id / {"align-" yymmdd} (and append "-1" or "-2" if that folder exists)
+    # check for folder like EXPERIMENTS_DIR / project_id / {"align-" yymmdd} (and append "_1" or "_2" if that folder exists)
     # then create config.yml in that folder using get_align_config
     today_str = datetime.now().strftime("%y%m%d")
     base_folder = os.path.join(EXPERIMENTS_DIR, project_id)
-    align_folder_name = f"align-{today_str}"
+    align_folder_name = f"align_{today_str}"
     experiment_name = align_folder_name
     align_folder = os.path.join(base_folder, align_folder_name)
 
     suffix = 1
     while os.path.exists(align_folder):
         suffix += 1
-        experiment_name = f"{align_folder_name}-{suffix}"
+        experiment_name = f"{align_folder_name}_{suffix}"
         align_folder = os.path.join(base_folder, experiment_name)
 
     os.makedirs(align_folder, exist_ok=True)

@@ -183,9 +183,9 @@ async def create_project(
             detail="First uploaded file has no filename.",
         )
 
-    date = datetime.now().strftime("%Y-%m-%d")
+    today_str = datetime.now().strftime("%y%m%d")
 
-    project_id = first_file.filename.split("/")[0] + f"-{date}"
+    project_id = first_file.filename.split("/")[0] + f"_{today_str}"
     project_path = PARATEXT_PROJECTS_DIR / project_id
     print(f"Creating project directory at: {project_path}")
 
