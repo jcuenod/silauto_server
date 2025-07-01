@@ -1,5 +1,5 @@
 import asyncio
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Query
 import yaml
 from ..state import translation_cache
@@ -89,15 +89,28 @@ async def scan():
 
 @router.get("/", response_model=List[Draft])
 async def read_drafts(
-    project_id: str = Query(None, description="Project ID to filter translations by"),
+    project_id: Optional[str] = Query(
+        None, description="Project ID to filter translations by"
+    ),
+    experiment_name: Optional[str] = Query(
+        None, description="Experiment name to filter translations by"
+    ),
 ):
     """
-    Retrieve a list of available translations for a given project id (required).
+    Retrieve a list of available translations for a given project id or experiment name (must provide at least one of the two).
     """
 
-    translations = [t for t in translation_cache if t.project_id == project_id]
+    if not project_id and not experiment_name:
+        raise ValueError("Must provide at least one of project_id or experiment_name")
 
-    if not translations:
-        return []
+    translations = [t for t in translation_cache]
+
+    if project_id:
+        translations = [t for t in translations if t.project_id == project_id]
+
+    if experiment_name:
+        translations = [
+            t for t in translations if t.train_experiment_name == experiment_name
+        ]
 
     return translations

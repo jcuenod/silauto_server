@@ -42,14 +42,18 @@ class ParatextProject(BaseModel):
     def get_tasks(self, tasks):
         # let's get the likely scripture file name based on the project's id
         scripture_related_tasks = [
-            t for t in tasks if t.has_scripture_file(self.scripture_filename)
+            t for t in tasks if t.has_target_scripture_file(self.scripture_filename)
         ]
 
         project_related_tasks = [t for t in tasks if t.has_project_id(self.id)]
 
         all_related_tasks = scripture_related_tasks + project_related_tasks
-        all_related_tasks.sort(key=lambda t: t.created_at, reverse=True)
-        return all_related_tasks
+        # Deduplicate tasks by their id, keeping the most recent one
+        deduped_sorted = {}
+        for t in sorted(all_related_tasks, key=lambda t: t.created_at, reverse=True):
+            if t.id not in deduped_sorted:
+                deduped_sorted[t.id] = t
+        return list(deduped_sorted.values())
 
 
 # --- Base Task Model (Internal Representation) ---
@@ -124,13 +128,13 @@ class Task(BaseModel):
     error: Optional[str] = None
     parameters: TaskParams
 
-    def has_scripture_file(self, scripture_filename):
+    def has_target_scripture_file(self, scripture_filename):
         if self.kind == TaskKind.ALIGN or self.kind == TaskKind.TRAIN:
             return self.parameters.target_scripture_file == scripture_filename  # type: ignore (that's why we have the taskkind guard)
         return False
 
     def has_project_id(self, project_id):
-        if self.kind == TaskKind.EXTRACT:
+        if self.kind == TaskKind.EXTRACT or self.kind == TaskKind.TRAIN:
             return self.parameters.project_id == project_id  # type: ignore
 
         if self.kind == TaskKind.TRANSLATE:
