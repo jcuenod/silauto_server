@@ -7,7 +7,8 @@ from fastapi import APIRouter, HTTPException, Query, status
 import yaml
 import csv
 
-from app.constants import EXPERIMENTS_DIR
+from app.constants import EXPERIMENTS_DIR, SCRIPTURE_DIR
+from app.routers.scriptures import _process_scripture_file
 from app.state import tasks_cache, lang_codes_cache
 
 from app.models import (
@@ -124,7 +125,11 @@ def load_experiment_from_path(experiment_path: Path) -> Optional[Task]:
         # It's an align task
         sources = config_data.get("corpus_pairs", [])[0].get("src", [])
         maybe_array_of_targets = config_data.get("corpus_pairs", [])[0].get("trg", [])
-        target = maybe_array_of_targets[0] if isinstance(maybe_array_of_targets, list) else maybe_array_of_targets
+        target = (
+            maybe_array_of_targets[0]
+            if isinstance(maybe_array_of_targets, list)
+            else maybe_array_of_targets
+        )
 
         if len(sources) == 0 or not target:
             raise Exception(
@@ -481,24 +486,51 @@ async def update_task_status(task_id: str, status_update: TaskStatusUpdate):
 
     # Update basic task properties
     db_task.status = status_update.status
-    
+
     # Handle error messages
     if status_update.error:
         db_task.error = status_update.error
     elif status_update.status == TaskStatus.COMPLETED:
         # Clear error on successful completion
         db_task.error = None
-    
+
     # Update timestamps based on status
     if status_update.status == TaskStatus.RUNNING and db_task.started_at is None:
         db_task.started_at = current_time
-    elif status_update.status in [TaskStatus.FAILED, TaskStatus.CANCELLED, TaskStatus.COMPLETED]:
+    elif status_update.status in [
+        TaskStatus.FAILED,
+        TaskStatus.CANCELLED,
+        TaskStatus.COMPLETED,
+    ]:
         db_task.ended_at = current_time
 
-    # Special handling for completed align/train tasks - reload from experiment
-    if (status_update.status == TaskStatus.COMPLETED and 
-        db_task.kind in [TaskKind.ALIGN, TaskKind.TRAIN]):
-        
+    # Special handling for completed tasks (updating state)
+    if status_update.status == TaskStatus.COMPLETED and db_task.kind in [
+        TaskKind.EXTRACT
+    ]:
+        # here we need to update the project and the list of scriptures
+        matching_scripture_files = list(SCRIPTURE_DIR.glob("*SBT_A_250701.txt"))
+        if len(matching_scripture_files) > 1:
+            print(
+                "Warning: Multiple scripture files match - \n", matching_scripture_files
+            )
+        elif len(matching_scripture_files) == 0:
+            print("Error: No matching scripture files")
+
+        for s in matching_scripture_files:
+            if s in scripture_cache:
+                continue
+
+            new_scripture = await _process_scripture_file(s)
+            if not new_scripture:
+                continue
+
+            scripture_cache[new_scripture.id] = new_scripture
+
+    elif status_update.status == TaskStatus.COMPLETED and db_task.kind in [
+        TaskKind.ALIGN,
+        TaskKind.TRAIN,
+    ]:
         exp_name = db_task.parameters.experiment_name  # type: ignore
         if exp_name:
             # All we care about is actually the results
