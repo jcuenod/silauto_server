@@ -50,7 +50,7 @@ async def health_check():
     """
     Health check endpoint with cache status information.
     """
-    from app.state import project_cache, scripture_cache, translation_cache
+    from app.state import project_cache, scripture_cache, drafts_cache
 
     return {
         "status": "healthy",
@@ -59,7 +59,7 @@ async def health_check():
             "scriptures": len(scripture_cache)
             if ENABLE_SCRIPTURE_CACHE
             else "disabled",
-            "translations": len(translation_cache)
+            "translations": len(drafts_cache)
             if ENABLE_TRANSLATION_CACHE
             else "disabled",
         },

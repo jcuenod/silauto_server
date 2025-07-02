@@ -9,11 +9,12 @@ import csv
 
 from app.constants import EXPERIMENTS_DIR, SCRIPTURE_DIR
 from app.routers.scriptures import _process_scripture_file
-from app.state import tasks_cache, lang_codes_cache
+from app.state import tasks_cache, lang_codes_cache, drafts_cache
 
 from app.models import (
     CreateAlignTaskParams,
     CreateTrainTaskParams,
+    Draft,
     Task,
     TaskKind,
     TaskParams,
@@ -21,7 +22,7 @@ from app.models import (
     TaskStatusUpdate,
     AlignTaskParams,
     TrainTaskParams,
-    TranslateTaskParams,
+    DraftTaskParams,
     ExtractTaskParams,
 )
 
@@ -196,7 +197,6 @@ def load_experiment_from_path(experiment_path: Path) -> Optional[Task]:
         if not results:
             results = None
 
-        # This is what silnlp will want for translate tasks
         params = TrainTaskParams(
             project_id=project_id,
             experiment_name=experiment_name,
@@ -349,14 +349,14 @@ async def create_train_task(params: CreateTrainTaskParams):
 
 
 @router.post(
-    "/translate_task",
+    "/draft_task",
     response_model=Task,
     status_code=status.HTTP_201_CREATED,
-    summary="Create Translation Task",
+    summary="Create Draft Task",
 )
-async def create_translate_task(params: TranslateTaskParams):
+async def create_draft_task(params: DraftTaskParams):
     """
-    Create a new **Translation** task.
+    Create a new **Draft** task.
 
     Requires:
     - Target Project ID.
@@ -378,7 +378,7 @@ async def create_translate_task(params: TranslateTaskParams):
     task_id = str(uuid.uuid4())
     db_task = Task(
         id=task_id,
-        kind=TaskKind.TRANSLATE,
+        kind=TaskKind.DRAFT,
         status=TaskStatus.QUEUED,
         created_at=datetime.now(timezone.utc),
         parameters=params,
@@ -505,39 +505,55 @@ async def update_task_status(task_id: str, status_update: TaskStatusUpdate):
         db_task.ended_at = current_time
 
     # Special handling for completed tasks (updating state)
-    if status_update.status == TaskStatus.COMPLETED and db_task.kind in [
-        TaskKind.EXTRACT
-    ]:
-        # here we need to update the project and the list of scriptures
-        matching_scripture_files = list(SCRIPTURE_DIR.glob("*SBT_A_250701.txt"))
-        if len(matching_scripture_files) > 1:
-            print(
-                "Warning: Multiple scripture files match - \n", matching_scripture_files
-            )
-        elif len(matching_scripture_files) == 0:
-            print("Error: No matching scripture files")
+    if status_update.status == TaskStatus.COMPLETED:
+        # EXTRACT Task
+        if db_task.kind == TaskKind.EXTRACT:
+            # here we need to update the project and the list of scriptures
+            matching_scripture_files = list(SCRIPTURE_DIR.glob("*SBT_A_250701.txt"))
+            if len(matching_scripture_files) > 1:
+                print(
+                    "Warning: Multiple scripture files match - \n",
+                    matching_scripture_files,
+                )
+            elif len(matching_scripture_files) == 0:
+                print("Error: No matching scripture files")
 
-        for s in matching_scripture_files:
-            if s in scripture_cache:
-                continue
+            for s in matching_scripture_files:
+                if s in scripture_cache:
+                    continue
 
-            new_scripture = await _process_scripture_file(s)
-            if not new_scripture:
-                continue
+                new_scripture = await _process_scripture_file(s)
+                if not new_scripture:
+                    continue
 
-            scripture_cache[new_scripture.id] = new_scripture
+                scripture_cache[new_scripture.id] = new_scripture
 
-    elif status_update.status == TaskStatus.COMPLETED and db_task.kind in [
-        TaskKind.ALIGN,
-        TaskKind.TRAIN,
-    ]:
-        exp_name = db_task.parameters.experiment_name  # type: ignore
-        if exp_name:
-            # All we care about is actually the results
-            updated_task = load_experiment_from_path(EXPERIMENTS_DIR / exp_name)
-            if updated_task:
-                # Update the original task with fresh experiment data, preserving the original ID
-                db_task.parameters = updated_task.parameters  # Get fresh results
+        # DRAFT Task
+        elif db_task.kind == TaskKind.DRAFT:
+            params: DraftTaskParams = db_task.parameters  # type: ignore
+            project_id = tasks_cache[params.train_task_id].parameters.project_id  # type: ignore
+            for book in params.book_names:
+                drafts_cache.append(
+                    Draft(
+                        project_id=project_id,
+                        train_experiment_name=params.experiment_name,
+                        source_scripture_name=params.source_project_id,
+                        book_name=book,
+                    )
+                )
+
+        # ALIGN/TRAIN Task
+        elif db_task.kind in [
+            TaskKind.ALIGN,
+            TaskKind.TRAIN,
+        ]:
+            exp_name = db_task.parameters.experiment_name  # type: ignore
+            if exp_name:
+                # All we care about is actually the results
+                updated_task = load_experiment_from_path(EXPERIMENTS_DIR / exp_name)
+                if updated_task:
+                    # Update the original task with fresh experiment data, preserving the original ID
+                    db_task.parameters = updated_task.parameters  # Get fresh results
 
     # Update the cache
     tasks_cache[task_id] = db_task

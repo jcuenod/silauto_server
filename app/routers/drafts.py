@@ -2,7 +2,7 @@ import asyncio
 from typing import List, Optional
 from fastapi import APIRouter, Query
 import yaml
-from ..state import translation_cache
+from app.state import drafts_cache
 
 from app.constants import EXPERIMENTS_DIR
 from app.models import Draft
@@ -16,7 +16,7 @@ router = APIRouter(
 # --- Helper Functions ---
 
 
-async def _process_translation_file(f):
+async def _process_draft_file(f):
     """Process a single translation file asynchronously."""
     try:
         if not f.is_file():
@@ -43,14 +43,14 @@ async def _process_translation_file(f):
 
         # the last two parts of the parent folder of config_file_path are the experiment name
         experiment_name = "/".join(str(config_file_path.parent).split("/")[-2:])
-        translation = Draft(
+        draft = Draft(
             project_id=target_project_id,
             train_experiment_name=experiment_name,
             source_scripture_name=f.parent.name,
             # name without the leading digits and without the .SFM extension
             book_name=f.name[2:].split(".")[0],
         )
-        return translation
+        return draft
     except Exception as e:
         print(f"Error processing translation file {f.name}: {e}")
         return None
@@ -60,8 +60,8 @@ async def scan():
     """
     Asynchronously scans the SILNLP_DATA/MT/experiments directory for .SFM files in `infer/` subdirectories.
     """
-    global translation_cache
-    translation_cache = []
+    global drafts_cache
+    drafts_cache = []
     print(f"Scanning {EXPERIMENTS_DIR} for translations...")
 
     if not EXPERIMENTS_DIR.is_dir():
@@ -75,13 +75,13 @@ async def scan():
     file_paths = await asyncio.to_thread(get_sfm_files)
 
     # Process files concurrently
-    tasks = [_process_translation_file(f) for f in file_paths]
+    tasks = [_process_draft_file(f) for f in file_paths]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     # Filter out None results and exceptions
-    translation_cache = [t for t in results if isinstance(t, Draft)]
+    drafts_cache = [t for t in results if isinstance(t, Draft)]
 
-    print(f"Translation processing complete. Found {len(translation_cache)} files.")
+    print(f"Translation processing complete. Found {len(drafts_cache)} files.")
 
 
 # --- API Routes ---
@@ -103,14 +103,12 @@ async def read_drafts(
     if not project_id and not experiment_name:
         raise ValueError("Must provide at least one of project_id or experiment_name")
 
-    translations = [t for t in translation_cache]
+    drafts = [t for t in drafts_cache]
 
     if project_id:
-        translations = [t for t in translations if t.project_id == project_id]
+        drafts = [t for t in drafts if t.project_id == project_id]
 
     if experiment_name:
-        translations = [
-            t for t in translations if t.train_experiment_name == experiment_name
-        ]
+        drafts = [t for t in drafts if t.train_experiment_name == experiment_name]
 
-    return translations
+    return drafts

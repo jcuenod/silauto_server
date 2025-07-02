@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, computed_field
 class TaskKind(str, Enum):
     ALIGN = "align"
     TRAIN = "train"
-    TRANSLATE = "translate"
+    DRAFT = "draft"
     EXTRACT = "extract"
 
 
@@ -90,7 +90,7 @@ class TrainTaskParams(CreateTrainTaskParams):
     # other settings...
 
 
-class TranslateTaskParams(BaseModel):
+class DraftTaskParams(BaseModel):
     experiment_name: str
     train_task_id: str = Field(
         ...,
@@ -113,9 +113,7 @@ class ExtractTaskParams(BaseModel):
     pass
 
 
-TaskParams = Union[
-    AlignTaskParams, TrainTaskParams, TranslateTaskParams, ExtractTaskParams
-]
+TaskParams = Union[AlignTaskParams, TrainTaskParams, DraftTaskParams, ExtractTaskParams]
 
 
 # This is what we store and return. It includes common fields.
@@ -138,7 +136,7 @@ class Task(BaseModel):
         if self.kind == TaskKind.EXTRACT or self.kind == TaskKind.TRAIN:
             return self.parameters.project_id == project_id  # type: ignore
 
-        if self.kind == TaskKind.TRANSLATE:
+        if self.kind == TaskKind.DRAFT:
             return self.parameters.source_project_id == project_id  # type: ignore
 
         return False
