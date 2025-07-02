@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Dict, Optional
-from fastapi import APIRouter, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, HTTPException, Query, status, UploadFile, File
 from app.state import tasks_cache, project_cache
 
 from app.constants import PARATEXT_PROJECTS_DIR
@@ -322,15 +322,33 @@ async def create_project(
 
 
 @router.get("/", response_model=List[ParatextProject])
-async def read_projects(skip: int = 0, limit: int = 100):
+async def read_projects(
+    skip: int = 0,
+    limit: int = 100,
+    scripture_filename: Optional[str] = Query(
+        None,
+        description="Optional scripture filename to filter projects by.",
+    ),
+):
     """
     Retrieve a list of projects from the cache.
     """
     # Read directly from the cache values
-    projects = list(project_cache.values())
+
     # Ensure sorting by creation date (newest first) as cache might not preserve insertion order perfectly
     # Although scan_projects sorts it initially, create/delete might affect order if not careful.
     # Re-sorting here ensures consistency.
+
+    projects = (
+        [
+            p
+            for p in project_cache.values()
+            if p.scripture_filename == scripture_filename
+        ]
+        if scripture_filename
+        else list(project_cache.values())
+    )
+
     projects.sort(key=lambda p: p.created_at, reverse=True)
     return projects[skip : skip + limit]
 
