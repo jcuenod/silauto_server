@@ -138,10 +138,14 @@ def scan() -> List[ParatextProject]:
                     project = load_project_from_path(subitem)
                     if project:
                         found_projects[project.id] = project
+                    else:
+                        print("Could not load project in _projectsById:", subitem)
             else:
                 project = load_project_from_path(item)
                 if project:
                     found_projects[project.id] = project
+                else:
+                    print("Could not load project:", item)
 
     # Sort projects by creation date, newest first
     sorted_projects = sorted(

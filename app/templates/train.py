@@ -97,7 +97,7 @@ def create_train_config_for(
     suffix = 1
     folder_name = train_folder_name
     while os.path.exists(train_folder):
-        folder_name = f"{train_folder_name}-{suffix}"
+        folder_name = f"{train_folder_name}_{suffix}"
         train_folder = os.path.join(base_folder, folder_name)
         suffix += 1
 
