@@ -37,7 +37,7 @@ class ParatextProject(BaseModel):
 
     @computed_field
     @property
-    def scripture_filename(self):
+    def scripture_filename(self) -> str:
         return f"{self.iso_code}-{self.id}"
 
     def get_tasks(self, tasks):
