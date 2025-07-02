@@ -61,7 +61,7 @@ async def scan():
     Asynchronously scans the SILNLP_DATA/MT/experiments directory for .SFM files in `infer/` subdirectories.
     """
     global drafts_cache
-    drafts_cache = []
+    drafts_cache.clear()
     print(f"Scanning {EXPERIMENTS_DIR} for translations...")
 
     if not EXPERIMENTS_DIR.is_dir():
@@ -75,11 +75,13 @@ async def scan():
     file_paths = await asyncio.to_thread(get_sfm_files)
 
     # Process files concurrently
-    tasks = [_process_draft_file(f) for f in file_paths]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+    draft_tasks = [_process_draft_file(f) for f in file_paths]
+    draft_results = await asyncio.gather(*draft_tasks, return_exceptions=True)
 
     # Filter out None results and exceptions
-    drafts_cache = [t for t in results if isinstance(t, Draft)]
+    for draft in draft_results:
+        if isinstance(draft, Draft):
+            drafts_cache.append(draft)
 
     print(f"Translation processing complete. Found {len(drafts_cache)} files.")
 
