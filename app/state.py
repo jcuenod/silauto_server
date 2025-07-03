@@ -1,9 +1,16 @@
-from typing import Dict, List
-from app.models import ParatextProject, Scripture, Task, Draft
+from app.controllers.database import init_database
+from app.controllers.tasks import TasksController
+from app.controllers.projects import ProjectsController
+from app.controllers.scriptures import ScripturesController
+from app.controllers.drafts import DraftsController
+from app.controllers.lang_codes import LangCodesController
 
-# In-memory storage (replace with database later)
-tasks_cache: Dict[str, Task] = {}
-project_cache: Dict[str, ParatextProject] = {}
-scripture_cache: Dict[str, Scripture] = {}
-drafts_cache: List[Draft] = []
-lang_codes_cache: Dict[str, List[str]] = {}
+# Initialize database on module import
+init_database()
+
+# Controllers for database operations
+tasks_controller = TasksController()
+projects_controller = ProjectsController()
+scriptures_controller = ScripturesController()
+drafts_controller = DraftsController()
+lang_codes_controller = LangCodesController()

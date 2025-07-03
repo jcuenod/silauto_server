@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, status
 
-from app.state import lang_codes_cache
+from app.state import lang_codes_controller
 
 router = APIRouter(
     prefix="/lang_codes",
@@ -20,12 +20,11 @@ async def get_lang_codes(
     Get language codes and their associated scripts.
 
     If `lang_code` is provided, returns the scripts for that specific language code.
-    If not provided, returns all available language codes and their scripts.
     """
-    if not lang_code or lang_code not in lang_codes_cache:
+    codes = lang_codes_controller.get_by_code(lang_code)
+    if not codes:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Language code '{lang_code}' not found.",
         )
-
-    return lang_codes_cache[lang_code]
+    return codes

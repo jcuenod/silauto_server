@@ -1,0 +1,182 @@
+"""
+Database controller for SQLite operations.
+"""
+
+import asyncio
+import sqlite3
+import json
+from contextlib import contextmanager
+from typing import Any
+from pathlib import Path
+import threading
+from app.routers import drafts, projects, tasks, scriptures
+
+from app.constants import DATABASE_PATH
+
+# Import configuration
+from app.config import (
+    ENABLE_SCRIPTURE_CACHE,
+    ENABLE_TRANSLATION_CACHE,
+    ENABLE_PROJECT_CACHE,
+    ENABLE_TASKS_CACHE,
+    SKIP_HEAVY_OPERATIONS_ON_STARTUP,
+)
+
+# Thread-local storage for database connections
+_local = threading.local()
+
+
+def get_db_connection() -> sqlite3.Connection:
+    """Get a database connection from thread-local storage."""
+    if not hasattr(_local, 'connection'):
+        # Ensure the directory exists
+        Path(DATABASE_PATH).parent.mkdir(parents=True, exist_ok=True)
+        
+        _local.connection = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
+        _local.connection.row_factory = sqlite3.Row
+        _local.connection.execute("PRAGMA foreign_keys = ON")
+        _local.connection.execute("PRAGMA journal_mode = WAL")
+    
+    return _local.connection
+
+
+@contextmanager
+def get_db():
+    """Context manager for database operations."""
+    conn = get_db_connection()
+    try:
+        yield conn
+    except Exception:
+        conn.rollback()
+        raise
+    else:
+        conn.commit()
+
+
+def init_database():
+    """Initialize the database with required tables and populate caches if tables are created."""
+    tables_created = False
+    with get_db() as conn:
+        # Tasks table
+        result = conn.execute("""
+            CREATE TABLE IF NOT EXISTS tasks (
+                id TEXT PRIMARY KEY,
+                kind TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'queued',
+                created_at TEXT NOT NULL,
+                started_at TEXT,
+                ended_at TEXT,
+                error TEXT,
+                parameters TEXT NOT NULL
+            )
+        """)
+        if result.rowcount == -1:
+            tables_created = True
+
+        # Projects table
+        result = conn.execute("""
+            CREATE TABLE IF NOT EXISTS projects (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                full_name TEXT NOT NULL,
+                iso_code TEXT NOT NULL,
+                lang TEXT NOT NULL,
+                path TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                extract_task_id TEXT,
+                FOREIGN KEY (extract_task_id) REFERENCES tasks(id)
+            )
+        """)
+        if result.rowcount == -1:
+            tables_created = True
+
+        # Scripture table
+        result = conn.execute("""
+            CREATE TABLE IF NOT EXISTS scriptures (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                lang_code TEXT NOT NULL,
+                path TEXT NOT NULL,
+                stats TEXT NOT NULL
+            )
+        """)
+        if result.rowcount == -1:
+            tables_created = True
+
+        # Drafts table
+        result = conn.execute("""
+            CREATE TABLE IF NOT EXISTS drafts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id TEXT NOT NULL,
+                train_experiment_name TEXT NOT NULL,
+                source_scripture_name TEXT NOT NULL,
+                book_name TEXT NOT NULL,
+                UNIQUE(project_id, train_experiment_name, source_scripture_name, book_name)
+            )
+        """)
+        if result.rowcount == -1:
+            tables_created = True
+
+        # Lang codes table
+        result = conn.execute("""
+            CREATE TABLE IF NOT EXISTS lang_codes (
+                code TEXT NOT NULL,
+                name TEXT NOT NULL,
+                PRIMARY KEY (code, name)
+            )
+        """)
+        if result.rowcount == -1:
+            tables_created = True
+
+        # Create indexes for better performance
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_kind ON tasks(kind)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_projects_iso_code ON projects(iso_code)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_scriptures_lang_code ON scriptures(lang_code)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_drafts_project_id ON drafts(project_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_lang_codes_code ON lang_codes(code)")
+
+    if tables_created:
+        # Populate caches if any table was created
+        asyncio.run(populate_caches())
+
+
+def serialize_json(data: Any) -> str:
+    """Serialize data to JSON string."""
+    return json.dumps(data, default=str)
+
+
+def deserialize_json(data: str) -> Any:
+    """Deserialize JSON string to data."""
+    return json.loads(data)
+
+
+async def populate_caches():
+    """Populate caches with initial data."""
+    if SKIP_HEAVY_OPERATIONS_ON_STARTUP:
+        print(
+            "Skipping heavy operations on startup (SKIP_HEAVY_OPERATIONS_ON_STARTUP=true)"
+        )
+        print("Caches will be populated on first request")
+        return
+
+    things_to_scan = []
+
+    if ENABLE_PROJECT_CACHE:
+        print("- Scanning projects...")
+        things_to_scan.append(asyncio.to_thread(projects.scan))
+
+    if ENABLE_TRANSLATION_CACHE:
+        print("- Scanning translations...")
+        things_to_scan.append(drafts.scan())
+
+    if ENABLE_SCRIPTURE_CACHE:
+        print("- Scanning scriptures...")
+        things_to_scan.append(scriptures.scan())
+
+    if ENABLE_TASKS_CACHE:
+        print("- Scanning tasks...")
+        things_to_scan.append(tasks.scan())
+
+    if things_to_scan:
+        await asyncio.gather(*things_to_scan)

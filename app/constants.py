@@ -14,3 +14,7 @@ SILNLP_DATA = Path(SILNLP_DATA)
 PARATEXT_PROJECTS_DIR = SILNLP_DATA / "Paratext/projects"
 EXPERIMENTS_DIR = SILNLP_DATA / "MT/experiments"
 SCRIPTURE_DIR = SILNLP_DATA / "MT/scripture"
+
+DATABASE_PATH: str = os.getenv("DATABASE_PATH")  # type: ignore
+if not DATABASE_PATH:
+    raise ValueError("DATABASE_PATH environment variable is not set.")

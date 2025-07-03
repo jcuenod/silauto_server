@@ -1,4 +1,3 @@
-import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -10,8 +9,6 @@ from app.config import (
     ENABLE_SCRIPTURE_CACHE,
     ENABLE_TRANSLATION_CACHE,
     ENABLE_PROJECT_CACHE,
-    ENABLE_TASKS_CACHE,
-    SKIP_HEAVY_OPERATIONS_ON_STARTUP,
 )
 
 app = FastAPI(
@@ -50,67 +47,20 @@ async def health_check():
     """
     Health check endpoint with cache status information.
     """
-    from app.state import project_cache, scripture_cache, drafts_cache
+    from app.state import projects_controller, scriptures_controller, drafts_controller
 
     return {
         "status": "healthy",
         "caches": {
-            "projects": len(project_cache) if ENABLE_PROJECT_CACHE else "disabled",
-            "scriptures": len(scripture_cache)
+            "projects": projects_controller.count() if ENABLE_PROJECT_CACHE else "disabled",
+            "scriptures": scriptures_controller.count()
             if ENABLE_SCRIPTURE_CACHE
             else "disabled",
-            "translations": len(drafts_cache)
+            "translations": drafts_controller.count()
             if ENABLE_TRANSLATION_CACHE
             else "disabled",
         },
-        "config": {
-            "skip_heavy_operations": SKIP_HEAVY_OPERATIONS_ON_STARTUP,
-            "project_cache_enabled": ENABLE_PROJECT_CACHE,
-            "scripture_cache_enabled": ENABLE_SCRIPTURE_CACHE,
-            "translation_cache_enabled": ENABLE_TRANSLATION_CACHE,
-            "tasks_cache_enabled": ENABLE_TASKS_CACHE,
-        },
     }
-
-
-@app.on_event("startup")
-async def startup_event():
-    """
-    Event handler called when the FastAPI application starts.
-    Scans directories to populate caches based on configuration.
-    """
-    print("Application startup: Initializing caches...")
-
-    if SKIP_HEAVY_OPERATIONS_ON_STARTUP:
-        print(
-            "Skipping heavy operations on startup (SKIP_HEAVY_OPERATIONS_ON_STARTUP=true)"
-        )
-        print("Caches will be populated on first request")
-        return
-
-    things_to_scan = []
-
-    if ENABLE_PROJECT_CACHE:
-        print("- Scanning projects...")
-        things_to_scan.append(asyncio.to_thread(projects.scan))
-
-    if ENABLE_TRANSLATION_CACHE:
-        print("- Scanning translations...")
-        things_to_scan.append(drafts.scan())
-
-    if ENABLE_SCRIPTURE_CACHE:
-        print("- Scanning scriptures...")
-        things_to_scan.append(scriptures.scan())
-
-    if ENABLE_TASKS_CACHE:
-        print("- Scanning tasks...")
-        things_to_scan.append(tasks.scan())
-
-    if things_to_scan:
-        await asyncio.gather(*things_to_scan)
-
-    print("Caches initialized")
-
 
 # Example shutdown event (optional)
 # @app.on_event("shutdown")

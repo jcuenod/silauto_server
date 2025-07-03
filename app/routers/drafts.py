@@ -2,7 +2,7 @@ import asyncio
 from typing import List, Optional
 from fastapi import APIRouter, Query
 import yaml
-from app.state import drafts_cache
+from app.state import drafts_controller
 
 from app.constants import EXPERIMENTS_DIR
 from app.models import Draft
@@ -60,8 +60,7 @@ async def scan():
     """
     Asynchronously scans the SILNLP_DATA/MT/experiments directory for .SFM files in `infer/` subdirectories.
     """
-    global drafts_cache
-    drafts_cache.clear()
+    drafts_controller.clear()
     print(f"Scanning {EXPERIMENTS_DIR} for translations...")
 
     if not EXPERIMENTS_DIR.is_dir():
@@ -79,11 +78,16 @@ async def scan():
     draft_results = await asyncio.gather(*draft_tasks, return_exceptions=True)
 
     # Filter out None results and exceptions
+    drafts = []
     for draft in draft_results:
         if isinstance(draft, Draft):
-            drafts_cache.append(draft)
+            drafts.append(draft)
 
-    print(f"Translation processing complete. Found {len(drafts_cache)} files.")
+    # Bulk insert drafts
+    if drafts:
+        drafts_controller.bulk_insert(drafts)
+    
+    print(f"Translation processing complete. Found {len(drafts)} files.")
 
 
 # --- API Routes ---
@@ -105,7 +109,7 @@ async def read_drafts(
     if not project_id and not experiment_name:
         raise ValueError("Must provide at least one of project_id or experiment_name")
 
-    drafts = [t for t in drafts_cache]
+    drafts = drafts_controller.get_all()
 
     if project_id:
         drafts = [t for t in drafts if t.project_id == project_id]

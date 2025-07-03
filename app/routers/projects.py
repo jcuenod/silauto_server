@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Dict, Optional
 from fastapi import APIRouter, HTTPException, Query, status, UploadFile, File
-from app.state import tasks_cache, project_cache
+from app.state import tasks_controller, projects_controller
 
 from app.constants import PARATEXT_PROJECTS_DIR
 from app.models import ExtractTaskParams, ParatextProject
@@ -120,14 +120,13 @@ def scan() -> List[ParatextProject]:
     Scans the PARATEXT_PROJECTS_DIR for valid project directories, populates the cache,
     and returns a list of projects.
     """
-    global project_cache
     print(f"Scanning {PARATEXT_PROJECTS_DIR} for projects...")
     found_projects: Dict[str, ParatextProject] = {}
     if not PARATEXT_PROJECTS_DIR.is_dir():
         print(
             f"Warning: PARATEXT_PROJECTS_DIR '{PARATEXT_PROJECTS_DIR}' does not exist or is not a directory."
         )
-        project_cache.clear()
+        projects_controller.clear()
         return []
 
     for item in PARATEXT_PROJECTS_DIR.iterdir():
@@ -152,10 +151,10 @@ def scan() -> List[ParatextProject]:
         found_projects.values(), key=lambda p: p.created_at, reverse=True
     )
 
-    # Update the global cache
-    project_cache.clear()
-    project_cache.update({p.id: p for p in sorted_projects})
-    print(f"Project scan complete. Found {len(project_cache)} projects.")
+    # Update the database
+    projects_controller.clear()
+    projects_controller.bulk_insert(sorted_projects)
+    print(f"Project scan complete. Found {len(sorted_projects)} projects.")
     return sorted_projects
 
 
@@ -203,7 +202,7 @@ async def create_project(
         )
     except OSError as e:
         # Handle other potential filesystem errors (permissions, etc.)
-        # Log the error e
+        print(f"Error creating project directory: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create project directory.",
@@ -274,7 +273,7 @@ async def create_project(
                 project_id=project_id
             ),  # Add required parameters field
         )
-        tasks_cache[extract_task_id] = extract_task
+        tasks_controller.create(extract_task)
         print(
             f"Created associated extract task {extract_task_id} for project {project_id}"
         )
@@ -304,10 +303,10 @@ async def create_project(
             path=str(project_path.resolve()),  # Store the absolute path
             extract_task_id=extract_task_id,  # Store the link to the task
         )
-        # Add the new project to the cache
-        project_cache[project_id] = db_project
+        # Add the new project to the database
+        projects_controller.create(db_project)
         print(
-            f"Added project {project_id} to cache with extract task {extract_task_id}."
+            f"Added project {project_id} to database with extract task {extract_task_id}."
         )
         return db_project
 
@@ -333,20 +332,17 @@ async def read_projects(
     """
     Retrieve a list of projects from the cache.
     """
-    # Read directly from the cache values
-
-    # Ensure sorting by creation date (newest first) as cache might not preserve insertion order perfectly
-    # Although scan_projects sorts it initially, create/delete might affect order if not careful.
-    # Re-sorting here ensures consistency.
-
+    # Get projects from the database
+    all_projects = projects_controller.get_all()
+    
     projects = (
         [
             p
-            for p in project_cache.values()
+            for p in all_projects.values()
             if p.scripture_filename == scripture_filename
         ]
         if scripture_filename
-        else list(project_cache.values())
+        else list(all_projects.values())
     )
 
     projects.sort(key=lambda p: p.created_at, reverse=True)
@@ -356,15 +352,13 @@ async def read_projects(
 @router.get("/{project_id}", response_model=ParatextProject)
 async def read_project(project_id: str):
     """
-    Retrieve a single project by its ID from the cache.
+    Retrieve a single project by its ID from the database.
     """
-    project = project_cache.get(project_id)
+    project = projects_controller.get_by_id(project_id)
     if project is None:
-        # Optional: Could trigger a rescan here if not found in cache, but for now, rely on cache
-        # print(f"Project {project_id} not found in cache. Consider rescanning.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project with ID {project_id} not found in cache",
+            detail=f"Project with ID {project_id} not found",
         )
     return project
 
@@ -372,13 +366,14 @@ async def read_project(project_id: str):
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_project(project_id: str):
     """
-    Delete a project by removing its directory and cache entry.
+    Delete a project by removing its directory and database entry.
     """
-    # Check cache first
-    if not project_cache.get(project_id, None):
+    # Check database first
+    project = projects_controller.get_by_id(project_id)
+    if not project:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project with ID {project_id} not found in cache",
+            detail=f"Project with ID {project_id} not found",
         )
 
     project_path = get_project_path(project_id)
@@ -386,10 +381,10 @@ async def delete_project(project_id: str):
     # Double-check filesystem existence before attempting deletion
     if not project_path.is_dir():
         print(
-            f"Warning: Project {project_id} found in cache but directory not found at {project_path}. Removing from cache."
+            f"Warning: Project {project_id} found in database but directory not found at {project_path}. Removing from database."
         )
-        # Remove from cache even if directory is missing
-        del project_cache[project_id]
+        # Remove from database even if directory is missing
+        projects_controller.delete(project_id)
         # Return 404 as the resource state is inconsistent/not found on disk
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -399,10 +394,9 @@ async def delete_project(project_id: str):
     try:
         shutil.rmtree(project_path)
         print(f"Deleted project directory: {project_path}")
-        # Remove from cache *after* successful deletion
-        if not project_cache.get(project_id, None):
-            del project_cache[project_id]
-            print(f"Removed project {project_id} from cache.")
+        # Remove from database *after* successful deletion
+        projects_controller.delete(project_id)
+        print(f"Removed project {project_id} from database.")
 
     except OSError as e:
         print(f"Error deleting project directory {project_path}: {e}")

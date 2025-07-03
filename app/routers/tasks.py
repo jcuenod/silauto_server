@@ -9,7 +9,7 @@ import csv
 
 from app.constants import EXPERIMENTS_DIR, SCRIPTURE_DIR
 from app.routers.scriptures import _process_scripture_file
-from app.state import tasks_cache, lang_codes_cache, drafts_cache
+from app.state import tasks_controller, lang_codes_controller, drafts_controller
 
 from app.models import (
     CreateAlignTaskParams,
@@ -26,7 +26,7 @@ from app.models import (
     ExtractTaskParams,
 )
 
-from app.state import scripture_cache, project_cache
+from app.state import scriptures_controller, projects_controller
 from app.templates.align import create_align_config_for
 from app.templates.train import create_train_config_for
 
@@ -56,16 +56,16 @@ router = APIRouter(
 
 # --- Helper Function for Single Project Validation ---
 def _validate_project_id_exists(project_id: str):
-    """Checks if a single project ID exists in the cache."""
-    if project_id not in project_cache:
+    """Checks if a single project ID exists in the database."""
+    if not projects_controller.get_by_id(project_id):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Project with ID {project_id} not found in cache.",
+            detail=f"Project with ID {project_id} not found.",
         )
 
 
 def _validate_scripture_exists(scripture_file: str):
-    return scripture_file in scripture_cache
+    return scriptures_controller.get_by_id(scripture_file) is not None
 
 
 def _get_invalid_scripture_files(scripture_file_list: list[str]):
@@ -79,7 +79,7 @@ def _validate_task_exists(
     expected_status: Optional[TaskStatus] = None,
 ):
     """Checks if a task exists and optionally matches kind/status."""
-    task = tasks_cache.get(task_id)
+    task = tasks_controller.get_by_id(task_id)
     if not task:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -167,11 +167,12 @@ def load_experiment_from_path(experiment_path: Path) -> Optional[Task]:
 
         # Go through each kv pair and check that all the values are included in the lang_codes_cache
         for code, name in lang_codes.items():
-            if code not in lang_codes_cache:
-                lang_codes_cache[code] = []
-
-            if name not in lang_codes_cache[code]:
-                lang_codes_cache[code].append(name)
+            existing_names = lang_codes_controller.get_by_code(code)
+            if not existing_names:
+                lang_codes_controller.add(code, name)
+            else:
+                if name not in existing_names:
+                    lang_codes_controller.add(code, name)
 
         # Training corpus is not required, but the other fields are...
         if not target or not sources or not lang_codes:
@@ -222,12 +223,11 @@ def load_experiment_from_path(experiment_path: Path) -> Optional[Task]:
 
 async def scan():
     """Scans the EXPERIMENTS_DIR for valid experiment directories."""
-    global tasks_cache
     print(f"Scanning {EXPERIMENTS_DIR} for experiments...")
 
     if not EXPERIMENTS_DIR.is_dir():
         print(f"Warning: EXPERIMENTS_DIR '{EXPERIMENTS_DIR}' does not exist.")
-        tasks_cache.clear()
+        tasks_controller.clear()
         return []
 
     def get_experiments() -> List[Task]:
@@ -242,8 +242,8 @@ async def scan():
         return found_experiments
 
     tasks_list = await asyncio.to_thread(get_experiments)
-    tasks_cache.clear()
-    tasks_cache.update({t.id: t for t in tasks_list})
+    tasks_controller.clear()
+    tasks_controller.bulk_insert(tasks_list)
     print(f"Experiment scan complete. Found {len(tasks_list)} experiments.")
 
 
@@ -291,7 +291,7 @@ async def create_align_task(params: CreateAlignTaskParams):
         created_at=datetime.now(timezone.utc),
         parameters=task_parameters,
     )
-    tasks_cache[task_id] = db_task
+    tasks_controller.create(db_task)
     return db_task
 
 
@@ -307,7 +307,12 @@ async def create_train_task(params: CreateTrainTaskParams):
     Requires valid target and source project IDs.
     """
 
-    project = project_cache[params.project_id]
+    project = projects_controller.get_by_id(params.project_id)
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Project with ID {params.project_id} not found.",
+        )
 
     invalid_scripture_files = _get_invalid_scripture_files(
         [project.scripture_filename, *params.source_scripture_files]
@@ -344,7 +349,7 @@ async def create_train_task(params: CreateTrainTaskParams):
         created_at=datetime.now(timezone.utc),
         parameters=task_parameters,
     )
-    tasks_cache[task_id] = db_task
+    tasks_controller.create(db_task)
     return db_task
 
 
@@ -383,7 +388,7 @@ async def create_draft_task(params: DraftTaskParams):
         created_at=datetime.now(timezone.utc),
         parameters=params,
     )
-    tasks_cache[task_id] = db_task
+    tasks_controller.create(db_task)
     return db_task
 
 
@@ -409,13 +414,13 @@ async def create_extract_task(params: ExtractTaskParams):
         created_at=datetime.now(timezone.utc),
         parameters=params,
     )
-    tasks_cache[task_id] = db_task
+    tasks_controller.create(db_task)
     return db_task
 
 
 # # --- General Task Routes (Read, Update, Delete) ---
 def get_all_tasks():
-    tasks = list(tasks_cache.values())
+    tasks = list(tasks_controller.get_all().values())
     tasks.sort(key=lambda t: t.created_at, reverse=True)
     return tasks
 
@@ -432,7 +437,7 @@ async def read_tasks(
 
     all_tasks = get_all_tasks()
     if project_id:
-        project = project_cache.get(project_id)
+        project = projects_controller.get_by_id(project_id)
         if project is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -451,7 +456,7 @@ async def read_next_queued_task():
     Retrieve the next queued task.
     """
     next_queued = None
-    for t in tasks_cache.values():
+    for t in tasks_controller.get_all().values():
         if t.status == TaskStatus.QUEUED:
             print(t)
             if next_queued is None or t.created_at < next_queued.created_at:
@@ -476,7 +481,7 @@ async def update_task_status(task_id: str, status_update: TaskStatusUpdate):
     - **FAILED**: Task failed with an error
     - **CANCELLED**: Task was cancelled
     """
-    db_task = tasks_cache.get(task_id)
+    db_task = tasks_controller.get_by_id(task_id)
     if db_task is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
@@ -519,28 +524,30 @@ async def update_task_status(task_id: str, status_update: TaskStatusUpdate):
                 print("Error: No matching scripture files")
 
             for s in matching_scripture_files:
-                if s in scripture_cache:
+                if scriptures_controller.get_by_id(str(s)):
                     continue
 
                 new_scripture = await _process_scripture_file(s)
                 if not new_scripture:
                     continue
 
-                scripture_cache[new_scripture.id] = new_scripture
+                scriptures_controller.create(new_scripture)
 
         # DRAFT Task
         elif db_task.kind == TaskKind.DRAFT:
             params: DraftTaskParams = db_task.parameters  # type: ignore
-            project_id = tasks_cache[params.train_task_id].parameters.project_id  # type: ignore
-            for book in params.book_names:
-                drafts_cache.append(
-                    Draft(
-                        project_id=project_id,
-                        train_experiment_name=params.experiment_name,
-                        source_scripture_name=params.source_project_id,
-                        book_name=book,
+            train_task = tasks_controller.get_by_id(params.train_task_id)
+            if train_task:
+                project_id = train_task.parameters.project_id  # type: ignore
+                for book in params.book_names:
+                    drafts_controller.create(
+                        Draft(
+                            project_id=project_id,
+                            train_experiment_name=params.experiment_name,
+                            source_scripture_name=params.source_project_id,
+                            book_name=book,
+                        )
                     )
-                )
 
         # ALIGN/TRAIN Task
         elif db_task.kind in [
@@ -555,8 +562,8 @@ async def update_task_status(task_id: str, status_update: TaskStatusUpdate):
                     # Update the original task with fresh experiment data, preserving the original ID
                     db_task.parameters = updated_task.parameters  # Get fresh results
 
-    # Update the cache
-    tasks_cache[task_id] = db_task
+    # Update the database
+    tasks_controller.update(db_task)
     return db_task
 
 
@@ -565,7 +572,7 @@ async def read_task(task_id: str):
     """
     Retrieve a single task by its ID.
     """
-    db_task = tasks_cache.get(task_id)
+    db_task = tasks_controller.get_by_id(task_id)
     if db_task is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
@@ -578,7 +585,7 @@ async def delete_task(task_id: str):
     """
     Delete a task by its ID.
     """
-    if task_id not in tasks_cache:
+    if not tasks_controller.get_by_id(task_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
         )
@@ -588,5 +595,5 @@ async def delete_task(task_id: str):
     # if db_task.status == TaskStatus.RUNNING:
     #     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot delete a running task")
 
-    del tasks_cache[task_id]
+    tasks_controller.delete(task_id)
     return None  # No content response

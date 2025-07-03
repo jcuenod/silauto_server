@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Any, List, Dict, Optional
 from fastapi import APIRouter, Query
 from vref_utils import Vref
-from ..state import scripture_cache
+from ..state import scriptures_controller
 
 from app.constants import SCRIPTURE_DIR
 from app.models import Scripture
@@ -48,13 +48,12 @@ async def scan():
     Asynchronously scans the SILNLP_DATA/Paratext/scripture directory for .txt files,
     calculates stats using Vref in threads, and populates the cache.
     """
-    global scripture_cache
     print(f"Scanning {SCRIPTURE_DIR} for scripture files...")
     processed_scriptures: Dict[str, Scripture] = {}
 
     if not SCRIPTURE_DIR.is_dir():
         print(f"Warning: Scripture directory '{SCRIPTURE_DIR}' not found.")
-        scripture_cache.clear()
+        scriptures_controller.clear()
         return
 
     file_paths = [fp for fp in SCRIPTURE_DIR.glob("*.txt") if fp.is_file()]
@@ -62,7 +61,7 @@ async def scan():
 
     if total_files == 0:
         print("No scripture files found.")
-        scripture_cache.clear()
+        scriptures_controller.clear()
         return
 
     print(f"Found {total_files} scripture files to process...")
@@ -89,8 +88,9 @@ async def scan():
 
     # Sort by name for consistent ordering
     sorted_names = sorted(processed_scriptures.keys())
-    scripture_cache.update({name: processed_scriptures[name] for name in sorted_names})
-    print(f"Scripture scan complete. Found {len(scripture_cache)} files.")
+    scriptures_controller.clear()
+    scriptures_controller.bulk_insert([processed_scriptures[name] for name in sorted_names])
+    print(f"Scripture scan complete. Found {len(processed_scriptures)} files.")
 
 
 # --- API Routes ---
@@ -108,7 +108,7 @@ async def read_scriptures(
     Retrieve a list of available scripture files and their statistics.
     Optionally filter by a query string contained within the filename.
     """
-    scriptures = list(scripture_cache.values())
+    scriptures = list(scriptures_controller.get_all().values())
 
     if query:
         query_lower = query.lower()
