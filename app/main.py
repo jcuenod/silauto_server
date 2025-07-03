@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # Import routers
 from app.routers import drafts, projects, tasks, scriptures, lang_codes
+from app.state import projects_controller, scriptures_controller, drafts_controller, was_not_initialized
 
 # Import configuration
 from app.config import (
@@ -50,11 +51,6 @@ async def health_check():
     """
     Health check endpoint with cache status information.
     """
-    from app.state import projects_controller, scriptures_controller, drafts_controller, unpopulated
-    
-    if unpopulated:
-        # Populate caches if any table was created
-        asyncio.run(populate_caches())
 
     return {
         "status": "healthy",
@@ -98,6 +94,11 @@ async def populate_caches():
 
     if things_to_scan:
         await asyncio.gather(*things_to_scan)
+
+if was_not_initialized:
+    # Populate caches if any table was created
+    asyncio.run(populate_caches())
+        
 # Example shutdown event (optional)
 # @app.on_event("shutdown")
 # async def shutdown_event():

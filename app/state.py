@@ -6,7 +6,7 @@ from app.controllers.drafts import DraftsController
 from app.controllers.lang_codes import LangCodesController
 
 # Initialize database on module import
-unpopulated = init_database()
+was_not_initialized = init_database()
 
 # Controllers for database operations
 tasks_controller = TasksController()
