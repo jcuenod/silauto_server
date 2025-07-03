@@ -96,8 +96,7 @@ async def populate_caches():
         await asyncio.gather(*things_to_scan)
 
 if was_not_initialized:
-    # Populate caches if any table was created
-    asyncio.run(populate_caches())
+    asyncio.create_task(populate_caches())
         
 # Example shutdown event (optional)
 # @app.on_event("shutdown")
