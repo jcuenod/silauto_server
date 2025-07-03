@@ -2,25 +2,14 @@
 Database controller for SQLite operations.
 """
 
-import asyncio
 import sqlite3
 import json
 from contextlib import contextmanager
 from typing import Any
 from pathlib import Path
 import threading
-from app.routers import drafts, projects, tasks, scriptures
 
 from app.constants import DATABASE_PATH
-
-# Import configuration
-from app.config import (
-    ENABLE_SCRIPTURE_CACHE,
-    ENABLE_TRANSLATION_CACHE,
-    ENABLE_PROJECT_CACHE,
-    ENABLE_TASKS_CACHE,
-    SKIP_HEAVY_OPERATIONS_ON_STARTUP,
-)
 
 # Thread-local storage for database connections
 _local = threading.local()
@@ -136,9 +125,7 @@ def init_database():
         conn.execute("CREATE INDEX IF NOT EXISTS idx_drafts_project_id ON drafts(project_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_lang_codes_code ON lang_codes(code)")
 
-    if tables_created:
-        # Populate caches if any table was created
-        asyncio.run(populate_caches())
+    return tables_created
 
 
 def serialize_json(data: Any) -> str:
@@ -149,34 +136,3 @@ def serialize_json(data: Any) -> str:
 def deserialize_json(data: str) -> Any:
     """Deserialize JSON string to data."""
     return json.loads(data)
-
-
-async def populate_caches():
-    """Populate caches with initial data."""
-    if SKIP_HEAVY_OPERATIONS_ON_STARTUP:
-        print(
-            "Skipping heavy operations on startup (SKIP_HEAVY_OPERATIONS_ON_STARTUP=true)"
-        )
-        print("Caches will be populated on first request")
-        return
-
-    things_to_scan = []
-
-    if ENABLE_PROJECT_CACHE:
-        print("- Scanning projects...")
-        things_to_scan.append(asyncio.to_thread(projects.scan))
-
-    if ENABLE_TRANSLATION_CACHE:
-        print("- Scanning translations...")
-        things_to_scan.append(drafts.scan())
-
-    if ENABLE_SCRIPTURE_CACHE:
-        print("- Scanning scriptures...")
-        things_to_scan.append(scriptures.scan())
-
-    if ENABLE_TASKS_CACHE:
-        print("- Scanning tasks...")
-        things_to_scan.append(tasks.scan())
-
-    if things_to_scan:
-        await asyncio.gather(*things_to_scan)

@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -9,6 +10,8 @@ from app.config import (
     ENABLE_SCRIPTURE_CACHE,
     ENABLE_TRANSLATION_CACHE,
     ENABLE_PROJECT_CACHE,
+    ENABLE_TASKS_CACHE,
+    SKIP_HEAVY_OPERATIONS_ON_STARTUP,
 )
 
 app = FastAPI(
@@ -47,7 +50,11 @@ async def health_check():
     """
     Health check endpoint with cache status information.
     """
-    from app.state import projects_controller, scriptures_controller, drafts_controller
+    from app.state import projects_controller, scriptures_controller, drafts_controller, unpopulated
+    
+    if unpopulated:
+        # Populate caches if any table was created
+        asyncio.run(populate_caches())
 
     return {
         "status": "healthy",
@@ -62,6 +69,35 @@ async def health_check():
         },
     }
 
+async def populate_caches():
+    """Populate caches with initial data."""
+    if SKIP_HEAVY_OPERATIONS_ON_STARTUP:
+        print(
+            "Skipping heavy operations on startup (SKIP_HEAVY_OPERATIONS_ON_STARTUP=true)"
+        )
+        print("Caches will be populated on first request")
+        return
+
+    things_to_scan = []
+
+    if ENABLE_PROJECT_CACHE:
+        print("- Scanning projects...")
+        things_to_scan.append(asyncio.to_thread(projects.scan))
+
+    if ENABLE_TRANSLATION_CACHE:
+        print("- Scanning translations...")
+        things_to_scan.append(drafts.scan())
+
+    if ENABLE_SCRIPTURE_CACHE:
+        print("- Scanning scriptures...")
+        things_to_scan.append(scriptures.scan())
+
+    if ENABLE_TASKS_CACHE:
+        print("- Scanning tasks...")
+        things_to_scan.append(tasks.scan())
+
+    if things_to_scan:
+        await asyncio.gather(*things_to_scan)
 # Example shutdown event (optional)
 # @app.on_event("shutdown")
 # async def shutdown_event():
