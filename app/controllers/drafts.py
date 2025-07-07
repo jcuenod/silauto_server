@@ -77,13 +77,14 @@ class DraftsController:
         """Create a new draft."""
         with get_db() as conn:
             conn.execute("""
-                INSERT OR IGNORE INTO drafts (project_id, train_experiment_name, source_scripture_name, book_name)
+                INSERT OR IGNORE INTO drafts (project_id, train_experiment_name, source_scripture_name, book_name, has_pdf)
                 VALUES (?, ?, ?, ?)
             """, (
                 draft.project_id,
                 draft.train_experiment_name,
                 draft.source_scripture_name,
-                draft.book_name
+                draft.book_name,
+                draft.has_pdf
             ))
         
         return draft
@@ -124,8 +125,8 @@ class DraftsController:
             ]
             
             conn.executemany("""
-                INSERT OR IGNORE INTO drafts (project_id, train_experiment_name, source_scripture_name, book_name)
-                VALUES (?, ?, ?, ?)
+                INSERT OR IGNORE INTO drafts (project_id, train_experiment_name, source_scripture_name, book_name, has_pdf)
+                VALUES (?, ?, ?, ?, ?)
             """, data)
     
     @staticmethod

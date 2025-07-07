@@ -66,7 +66,7 @@ async def scan():
     Asynchronously scans the SILNLP_DATA/MT/experiments directory for .SFM files in `infer/` subdirectories.
     """
     drafts_controller.clear()
-    print(f"Scanning {EXPERIMENTS_DIR} for translations...")
+    print(f"Scanning {EXPERIMENTS_DIR} for drafts...")
 
     if not EXPERIMENTS_DIR.is_dir():
         print(f"Warning: Experiments directory '{EXPERIMENTS_DIR}' not found.")
@@ -92,7 +92,7 @@ async def scan():
     if drafts:
         drafts_controller.bulk_insert(drafts)
     
-    print(f"Translation processing complete. Found {len(drafts)} files.")
+    print(f"Draft processing complete. Found {len(drafts)} files.")
 
 
 # --- API Routes ---
