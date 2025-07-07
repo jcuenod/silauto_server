@@ -83,13 +83,13 @@ class TasksController:
                 SELECT id, kind, status, created_at, started_at, ended_at, error, parameters
                 FROM tasks
                 WHERE (
-                    kind == 'align' AND parameters -> 'target_scripture_file' == ?
+                    kind = 'align' AND json_extract(parameters, '$.target_scripture_file') = ?
                 ) OR (
-                    kind == 'train' AND parameters -> 'target_scripture_file' == ?
+                    kind = 'train' AND json_extract(parameters, '$.target_scripture_file') = ?
                 ) OR (
-                    kind == 'extract' AND parameters -> 'project_id' == ?
+                    kind = 'extract' AND json_extract(parameters, '$.project_id') = ?
                 ) OR (
-                    kind == 'draft' AND parameters -> 'source_project_id' == ?
+                    kind = 'draft' AND json_extract(parameters, '$.source_project_id') = ?
                 )
                 ORDER BY created_at DESC
                 LIMIT ?
