@@ -108,14 +108,9 @@ async def read_scriptures(
     Retrieve a list of available scripture files and their statistics.
     Optionally filter by a query string contained within the filename.
     """
-    scriptures = list(scriptures_controller.get_all().values())
 
     if query:
-        query_lower = query.lower()
-        scriptures = [
-            s
-            for s in scriptures
-            if query_lower in s.id.lower() or query_lower in s.lang_code.lower()
-        ]
+        return scriptures_controller.query(query, skip, limit)
 
-    return scriptures
+    
+    return scriptures_controller.get_all(skip, limit)

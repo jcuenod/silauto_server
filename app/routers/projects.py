@@ -10,7 +10,7 @@ from app.state import tasks_controller, projects_controller
 import zipfile
 from fastapi.responses import StreamingResponse
 
-from app.constants import PARATEXT_PROJECTS_DIR
+from app.constants import EXPERIMENTS_DIR, PARATEXT_PROJECTS_DIR
 from app.models import ExtractTaskParams, ParatextProject
 
 # Import Task related components needed for creation
@@ -371,42 +371,54 @@ async def download_project_drafts(project_id: str):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project directory for ID {project_id} not found",
         )
+    
+    # Collect all draft files organized by source project ID
+    drafts_by_source = {}  # source_id -> list of files
+    project_tasks = tasks_controller.get_for_project(project)
+    
+    for t in project_tasks:
+        if t.kind != TaskKind.DRAFT:
+            continue
+        
+        exp = t.parameters.experiment_name # type: ignore (always present on .DRAFT)
+        source_id = t.parameters.source_project_id # type: ignore (always present on .DRAFT)
 
-    drafts_dir = project_path / "infer"
-    sfm_files = [f for f in drafts_dir.rglob("*.SFM")]
-    pdf_files = [f for f in sfm_files if f.with_suffix(".pdf").exists()]
-    draft_files = sfm_files + pdf_files
+        drafts_dir = EXPERIMENTS_DIR / exp / "infer"
+        if not drafts_dir.exists():
+            continue
+            
+        sfm_files = [f for f in drafts_dir.glob(f"*/{source_id}/*.SFM") if f.is_file()]
+        pdf_files = [f for f in sfm_files if f.with_suffix(".pdf").exists()]
+        
+        all_files = sfm_files + pdf_files
+        
+        if source_id not in drafts_by_source:
+            drafts_by_source[source_id] = []
+        drafts_by_source[source_id].extend(all_files)
 
-    if not draft_files:
+    if not drafts_by_source:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No draft files found in this project.",
         )
 
-    # Check that all but the last directory in the paths are identical
-    # Example: /a/b/c/file1, /a/b/d/file2 -> ['a', 'b', 'c'], ['a', 'b', 'd']
-    def parent_dirs_up_to_last(path: Path):
-        parts = path.relative_to(project_path).parts
-        return parts[:-2] if len(parts) > 2 else ()
+    # Check for duplicates within each source project
+    for source_id, files in drafts_by_source.items():
+        filenames = [f.name for f in files]
+        if len(filenames) != len(set(filenames)):
+            duplicates = [name for name in set(filenames) if filenames.count(name) > 1]
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Duplicate files found for source project {source_id}: {duplicates}",
+            )
 
-    parent_dirs = [parent_dirs_up_to_last(f) for f in draft_files]
-    if len(set(parent_dirs)) > 1:
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail="Draft files are not organized under a common parent directory structure.",
-        )
-
-    # The last directory in the path (immediately above the file) should be included in the zip structure
+    # Create zip with source_project_id/filename structure
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
-        for file_path in draft_files:
-            rel = file_path.relative_to(project_path)
-            # arcname: last directory + filename
-            if len(rel.parts) > 1:
-                arcname = str(Path(rel.parts[-2]) / rel.parts[-1])
-            else:
-                arcname = rel.name
-            zipf.write(file_path, arcname=arcname)
+        for source_id, files in drafts_by_source.items():
+            for file_path in files:
+                arcname = f"{source_id}/{file_path.name}"
+                zipf.write(file_path, arcname=arcname)
     zip_buffer.seek(0)
 
     filename = f"{project_id}_drafts.zip"

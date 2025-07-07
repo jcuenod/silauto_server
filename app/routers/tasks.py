@@ -435,7 +435,6 @@ async def read_tasks(
     Retrieve a list of all tasks.
     """
 
-    all_tasks = get_all_tasks()
     if project_id:
         project = projects_controller.get_by_id(project_id)
         if project is None:
@@ -443,11 +442,9 @@ async def read_tasks(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Project with ID {project_id} not found.",
             )
-        tasks = project.get_tasks(all_tasks)
-    else:
-        tasks = all_tasks
+        return tasks_controller.get_for_project(project, skip, limit)
 
-    return tasks[skip : skip + limit]
+    return tasks_controller.get_all(skip, limit)
 
 
 @router.get("/next", response_model=Task)

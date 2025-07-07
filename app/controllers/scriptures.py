@@ -18,13 +18,21 @@ class ScripturesController:
             return cursor.fetchone()[0]
     
     @staticmethod
-    def get_all() -> Dict[str, Scripture]:
+    def get_all(
+        skip: int = 0,
+        limit: int = 1000,
+    ) -> Dict[str, Scripture]:
         """Get all scriptures as a dictionary."""
         with get_db() as conn:
             cursor = conn.execute("""
                 SELECT id, name, lang_code, path, stats
                 FROM scriptures
-            """)
+                LIMIT ?           
+                OFFSET ?
+            """, (
+                limit,
+                skip
+            ))
             
             scriptures = {}
             for row in cursor.fetchall():
@@ -60,6 +68,40 @@ class ScripturesController:
                 path=row['path'],
                 stats=deserialize_json(row['stats'])
             )
+    
+    @staticmethod
+    def query(
+        query:str,
+        skip: int = 0,
+        limit: int = 1000,
+    ) -> List[Scripture]:
+        with get_db() as conn:
+            comparison = query.lower()
+            cursor = conn.execute("""
+                SELECT id, name, lang_code, path, stats
+                FROM scriptures
+                WHERE id LIKE ? OR lang_code LIKE ?
+                LIMIT ?           
+                OFFSET ?
+            """, (
+                comparison,
+                comparison,
+                limit,
+                skip
+            ))
+            
+            scriptures = []
+            for row in cursor.fetchall():
+                scriptures.append(Scripture(
+                    id=row['id'],
+                    name=row['name'],
+                    lang_code=row['lang_code'],
+                    path=row['path'],
+                    stats=deserialize_json(row['stats'])
+                ))
+            
+            return scriptures
+
     
     @staticmethod
     def create(scripture: Scripture) -> Scripture:
