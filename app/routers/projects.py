@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Dict, Optional
 from fastapi import APIRouter, HTTPException, Query, status, UploadFile, File
-from app.state import tasks_controller, projects_controller
+from app.state import tasks_controller, projects_controller, drafts_controller
 import zipfile
 from fastapi.responses import StreamingResponse
 
@@ -376,25 +376,26 @@ async def download_project_drafts(project_id: str):
     drafts_by_source = {}  # source_id -> list of files
     project_tasks = tasks_controller.get_for_project(project)
     
-    for t in project_tasks:
-        if t.kind != TaskKind.DRAFT:
-            continue
+    drafts = drafts_controller.get_by_project_id(project.id)
+    # for t in project_tasks:
+    #     if t.kind != TaskKind.DRAFT:
+    #         continue
         
-        exp = t.parameters.experiment_name # type: ignore (always present on .DRAFT)
-        source_id = t.parameters.source_project_id # type: ignore (always present on .DRAFT)
+    #     exp = t.parameters.experiment_name # type: ignore (always present on .DRAFT)
+    #     source_id = t.parameters.source_scripture_files # type: ignore (always present on .DRAFT)
 
-        drafts_dir = EXPERIMENTS_DIR / exp / "infer"
-        if not drafts_dir.exists():
-            continue
+    #     drafts_dir = EXPERIMENTS_DIR / exp / "infer"
+    #     if not drafts_dir.exists():
+    #         continue
             
-        sfm_files = [f for f in drafts_dir.glob(f"*/{source_id}/*.SFM") if f.is_file()]
-        pdf_files = [f for f in sfm_files if f.with_suffix(".pdf").exists()]
+    #     sfm_files = [f for f in drafts_dir.glob(f"*/{source_id}/*.SFM") if f.is_file()]
+    #     pdf_files = [f for f in sfm_files if f.with_suffix(".pdf").exists()]
         
-        all_files = sfm_files + pdf_files
+    #     all_files = sfm_files + pdf_files
         
-        if source_id not in drafts_by_source:
-            drafts_by_source[source_id] = []
-        drafts_by_source[source_id].extend(all_files)
+    #     if source_id not in drafts_by_source:
+    #         drafts_by_source[source_id] = []
+    #     drafts_by_source[source_id].extend(all_files)
 
     if not drafts_by_source:
         raise HTTPException(

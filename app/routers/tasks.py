@@ -553,6 +553,7 @@ async def update_task_status(task_id: str, status_update: TaskStatusUpdate):
                             train_experiment_name=params.experiment_name,
                             source_scripture_name=params.source_project_id,
                             book_name=usfm_book_name,
+                            path=str(book.absolute()),
                             has_pdf=has_pdf,
                         )
                     )

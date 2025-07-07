@@ -22,7 +22,7 @@ class DraftsController:
         """Get all drafts as a list."""
         with get_db() as conn:
             cursor = conn.execute("""
-                SELECT project_id, train_experiment_name, source_scripture_name, book_name, has_pdf
+                SELECT project_id, train_experiment_name, source_scripture_name, book_name, path, has_pdf
                 FROM drafts
             """)
             
@@ -33,6 +33,7 @@ class DraftsController:
                     train_experiment_name=row['train_experiment_name'],
                     source_scripture_name=row['source_scripture_name'],
                     book_name=row['book_name'],
+                    path=row['path'],
                     has_pdf=row['has_pdf'],
                 )
                 drafts.append(draft)
@@ -40,11 +41,11 @@ class DraftsController:
             return drafts
     
     @staticmethod
-    def get_by_project_id(project_id: str, experiment_name: Optional[str], source_scripture_name: Optional[str]) -> List[Draft]:
+    def get_by_project_id(project_id: str, experiment_name: Optional[str] = None, source_scripture_name: Optional[str] = None) -> List[Draft]:
         """Get all drafts for a specific project."""
         with get_db() as conn:
             query = """
-                SELECT project_id, train_experiment_name, source_scripture_name, book_name, has_pdf
+                SELECT project_id, train_experiment_name, source_scripture_name, book_name, path, has_pdf
                 FROM drafts
                 WHERE project_id = ?
             """
@@ -66,6 +67,7 @@ class DraftsController:
                     train_experiment_name=row['train_experiment_name'],
                     source_scripture_name=row['source_scripture_name'],
                     book_name=row['book_name'],
+                    path=row['path'],
                     has_pdf=row['has_pdf']
                 )
                 drafts.append(draft)
@@ -77,14 +79,15 @@ class DraftsController:
         """Create a new draft."""
         with get_db() as conn:
             conn.execute("""
-                INSERT OR IGNORE INTO drafts (project_id, train_experiment_name, source_scripture_name, book_name, has_pdf)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT OR IGNORE INTO drafts (project_id, train_experiment_name, source_scripture_name, book_name, path, has_pdf)
+                VALUES (?, ?, ?, ?, ?, ?)
             """, (
                 draft.project_id,
                 draft.train_experiment_name,
                 draft.source_scripture_name,
                 draft.book_name,
-                draft.has_pdf
+                draft.path,
+                draft.has_pdf,
             ))
         
         return draft
@@ -120,14 +123,15 @@ class DraftsController:
                     draft.train_experiment_name,
                     draft.source_scripture_name,
                     draft.book_name,
+                    draft.path,
                     draft.has_pdf,
                 )
                 for draft in drafts
             ]
             
             conn.executemany("""
-                INSERT OR IGNORE INTO drafts (project_id, train_experiment_name, source_scripture_name, book_name, has_pdf)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT OR IGNORE INTO drafts (project_id, train_experiment_name, source_scripture_name, book_name, path, has_pdf)
+                VALUES (?, ?, ?, ?, ?, ?)
             """, data)
     
     @staticmethod
