@@ -78,7 +78,7 @@ class DraftsController:
         with get_db() as conn:
             conn.execute("""
                 INSERT OR IGNORE INTO drafts (project_id, train_experiment_name, source_scripture_name, book_name, has_pdf)
-                VALUES (?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?)
             """, (
                 draft.project_id,
                 draft.train_experiment_name,
@@ -119,7 +119,8 @@ class DraftsController:
                     draft.project_id,
                     draft.train_experiment_name,
                     draft.source_scripture_name,
-                    draft.book_name
+                    draft.book_name,
+                    draft.has_pdf,
                 )
                 for draft in drafts
             ]
