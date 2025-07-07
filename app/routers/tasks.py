@@ -539,13 +539,24 @@ async def update_task_status(task_id: str, status_update: TaskStatusUpdate):
             train_task = tasks_controller.get_by_id(params.train_task_id)
             if train_task:
                 project_id = train_task.parameters.project_id  # type: ignore
-                for book in params.book_names:
+
+                drafts_list = drafts_controller.get_by_project_id(project_id, params.experiment_name, params.source_project_id)
+                known_drafted_books = [d.book_name for d in drafts_list]
+                drafted_books = EXPERIMENTS_DIR.glob(f"{params.experiment_name}/infer/*/{params.source_project_id}/*.SFM")
+
+                for book in drafted_books:
+                    usfm_book_name = book.name[2:5]
+                    if usfm_book_name in known_drafted_books:
+                        continue
+
+                    has_pdf = book.with_suffix(".pdf").exists()
                     drafts_controller.create(
                         Draft(
                             project_id=project_id,
                             train_experiment_name=params.experiment_name,
                             source_scripture_name=params.source_project_id,
-                            book_name=book,
+                            book_name=usfm_book_name,
+                            has_pdf=has_pdf,
                         )
                     )
 

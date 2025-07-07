@@ -2,7 +2,7 @@
 Drafts controller for database operations.
 """
 
-from typing import List
+from typing import List, Optional
 from app.models import Draft
 from app.controllers.database import get_db
 
@@ -22,7 +22,7 @@ class DraftsController:
         """Get all drafts as a list."""
         with get_db() as conn:
             cursor = conn.execute("""
-                SELECT project_id, train_experiment_name, source_scripture_name, book_name
+                SELECT project_id, train_experiment_name, source_scripture_name, book_name, has_pdf
                 FROM drafts
             """)
             
@@ -32,21 +32,32 @@ class DraftsController:
                     project_id=row['project_id'],
                     train_experiment_name=row['train_experiment_name'],
                     source_scripture_name=row['source_scripture_name'],
-                    book_name=row['book_name']
+                    book_name=row['book_name'],
+                    has_pdf=row['has_pdf'],
                 )
                 drafts.append(draft)
             
             return drafts
     
     @staticmethod
-    def get_by_project_id(project_id: str) -> List[Draft]:
+    def get_by_project_id(project_id: str, experiment_name: Optional[str], source_scripture_name: Optional[str]) -> List[Draft]:
         """Get all drafts for a specific project."""
         with get_db() as conn:
-            cursor = conn.execute("""
-                SELECT project_id, train_experiment_name, source_scripture_name, book_name
+            query = """
+                SELECT project_id, train_experiment_name, source_scripture_name, book_name, has_pdf
                 FROM drafts
                 WHERE project_id = ?
-            """, (project_id,))
+            """
+            params = [project_id]
+
+            if experiment_name is not None:
+                query += " AND train_experiment_name = ?"
+                params.append(experiment_name)
+            if source_scripture_name is not None:
+                query += " AND source_scripture_name = ?"
+                params.append(source_scripture_name)
+
+            cursor = conn.execute(query, params)
             
             drafts = []
             for row in cursor.fetchall():
@@ -54,7 +65,8 @@ class DraftsController:
                     project_id=row['project_id'],
                     train_experiment_name=row['train_experiment_name'],
                     source_scripture_name=row['source_scripture_name'],
-                    book_name=row['book_name']
+                    book_name=row['book_name'],
+                    has_pdf=row['has_pdf']
                 )
                 drafts.append(draft)
             

@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 from typing import List, Optional
 from fastapi import APIRouter, Query
 import yaml
@@ -16,7 +17,7 @@ router = APIRouter(
 # --- Helper Functions ---
 
 
-async def _process_draft_file(f):
+async def _process_draft_file(f: Path):
     """Process a single translation file asynchronously."""
     try:
         if not f.is_file():
@@ -41,6 +42,9 @@ async def _process_draft_file(f):
 
         target_project_id = target_project.split("-")[-1]
 
+        pdf_path = f.with_suffix(".pdf")
+        has_pdf = pdf_path.exists()
+
         # the last two parts of the parent folder of config_file_path are the experiment name
         experiment_name = "/".join(str(config_file_path.parent).split("/")[-2:])
         draft = Draft(
@@ -49,6 +53,7 @@ async def _process_draft_file(f):
             source_scripture_name=f.parent.name,
             # name without the leading digits and without the .SFM extension
             book_name=f.name[2:].split(".")[0],
+            has_pdf=has_pdf,
         )
         return draft
     except Exception as e:

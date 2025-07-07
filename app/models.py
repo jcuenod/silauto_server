@@ -160,3 +160,4 @@ class Draft(BaseModel):
     train_experiment_name: str
     source_scripture_name: str
     book_name: str
+    has_pdf: bool

@@ -99,6 +99,7 @@ def init_database():
                 train_experiment_name TEXT NOT NULL,
                 source_scripture_name TEXT NOT NULL,
                 book_name TEXT NOT NULL,
+                has_pdf BOOLEAN NOT NULL,
                 UNIQUE(project_id, train_experiment_name, source_scripture_name, book_name)
             )
         """)
