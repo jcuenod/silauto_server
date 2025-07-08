@@ -18,45 +18,37 @@ class DraftsController:
             return cursor.fetchone()[0]
     
     @staticmethod
-    def get_all() -> List[Draft]:
-        """Get all drafts as a list."""
-        with get_db() as conn:
-            cursor = conn.execute("""
-                SELECT project_id, train_experiment_name, source_scripture_name, book_name, path, has_pdf
-                FROM drafts
-            """)
-            
-            drafts = []
-            for row in cursor.fetchall():
-                draft = Draft(
-                    project_id=row['project_id'],
-                    train_experiment_name=row['train_experiment_name'],
-                    source_scripture_name=row['source_scripture_name'],
-                    book_name=row['book_name'],
-                    path=row['path'],
-                    has_pdf=row['has_pdf'],
-                )
-                drafts.append(draft)
-            
-            return drafts
-    
-    @staticmethod
-    def get_by_project_id(project_id: str, experiment_name: Optional[str] = None, source_scripture_name: Optional[str] = None) -> List[Draft]:
-        """Get all drafts for a specific project."""
+    def get_all(
+        project_id: Optional[str] = None,
+        experiment_name: Optional[str] = None,
+        source_scripture_name: Optional[str] = None,
+        skip: int = 0,
+        limit: int = 1000
+    ) -> List[Draft]:
+        """Get drafts, optionally filtered by project_id, experiment_name, and source_scripture_name, with pagination."""
         with get_db() as conn:
             query = """
                 SELECT project_id, train_experiment_name, source_scripture_name, book_name, path, has_pdf
                 FROM drafts
-                WHERE project_id = ?
             """
-            params = [project_id]
+            conditions = []
+            params = []
 
+            if project_id is not None:
+                conditions.append("project_id = ?")
+                params.append(project_id)
             if experiment_name is not None:
-                query += " AND train_experiment_name = ?"
+                conditions.append("train_experiment_name = ?")
                 params.append(experiment_name)
             if source_scripture_name is not None:
-                query += " AND source_scripture_name = ?"
+                conditions.append("source_scripture_name = ?")
                 params.append(source_scripture_name)
+
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+
+            query += " LIMIT ? OFFSET ?"
+            params.extend([limit, skip])
 
             cursor = conn.execute(query, params)
             
@@ -68,7 +60,7 @@ class DraftsController:
                     source_scripture_name=row['source_scripture_name'],
                     book_name=row['book_name'],
                     path=row['path'],
-                    has_pdf=row['has_pdf']
+                    has_pdf=row['has_pdf'],
                 )
                 drafts.append(draft)
             

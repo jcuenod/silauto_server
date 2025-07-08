@@ -532,7 +532,7 @@ async def update_task_status(task_id: str, status_update: TaskStatusUpdate):
             if train_task:
                 project_id = train_task.parameters.project_id  # type: ignore
 
-                drafts_list = drafts_controller.get_by_project_id(project_id, params.experiment_name, params.source_project_id)
+                drafts_list = drafts_controller.get_all(project_id=project_id, experiment_name=params.experiment_name, source_scripture_name=params.source_project_id)
                 known_drafted_books = [d.book_name for d in drafts_list]
                 drafted_books = EXPERIMENTS_DIR.glob(f"{params.experiment_name}/infer/*/{params.source_project_id}/*.SFM")
 

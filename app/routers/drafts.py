@@ -22,6 +22,8 @@ async def _process_draft_file(f: Path):
     try:
         if not f.is_file():
             return None
+        
+        path_to_draft = str(f)
 
         # Get the infer directory path and append the config.yml file
         config_file_path = f.parent.parent.parent.parent / "config.yml"
@@ -51,6 +53,7 @@ async def _process_draft_file(f: Path):
             project_id=target_project_id,
             train_experiment_name=experiment_name,
             source_scripture_name=f.parent.name,
+            path=path_to_draft,
             # name without the leading digits and without the .SFM extension
             book_name=f.name[2:].split(".")[0],
             has_pdf=has_pdf,

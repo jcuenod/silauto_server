@@ -366,7 +366,7 @@ async def download_project_drafts(project_id: str):
     drafts_by_source = {}  # source_id -> list of files
     project_tasks = tasks_controller.get_for_project(project)
     
-    drafts = drafts_controller.get_by_project_id(project.id)
+    drafts = drafts_controller.get_all(project_id=project.id)
     # for t in project_tasks:
     #     if t.kind != TaskKind.DRAFT:
     #         continue
