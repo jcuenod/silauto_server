@@ -74,7 +74,7 @@ class ScripturesController:
         limit: int = 1000,
     ) -> List[Scripture]:
         with get_db() as conn:
-            comparison = query.lower()
+            comparison = f"%{query.lower()}%"
             cursor = conn.execute("""
                 SELECT id, name, lang_code, path, stats
                 FROM scriptures
