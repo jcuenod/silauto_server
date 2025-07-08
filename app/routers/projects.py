@@ -335,21 +335,11 @@ async def read_projects(
     """
     Retrieve a list of projects from the cache.
     """
-    # Get projects from the database
-    all_projects = projects_controller.get_all()
-    
-    projects = (
-        [
-            p
-            for p in all_projects.values()
-            if p.scripture_filename == scripture_filename
-        ]
-        if scripture_filename
-        else list(all_projects.values())
-    )
 
-    projects.sort(key=lambda p: p.created_at, reverse=True)
-    return projects[skip : skip + limit]
+    if scripture_filename:
+        return projects_controller.get_by_scripture_filename(scripture_filename, skip, limit)
+    
+    return projects_controller.get_all(skip, limit)
 
 
 @router.get("/{project_id}/download_drafts", response_model=ParatextProject)

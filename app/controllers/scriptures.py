@@ -21,7 +21,7 @@ class ScripturesController:
     def get_all(
         skip: int = 0,
         limit: int = 1000,
-    ) -> Dict[str, Scripture]:
+    ) -> List[Scripture]:
         """Get all scriptures as a dictionary."""
         with get_db() as conn:
             cursor = conn.execute("""
@@ -34,18 +34,16 @@ class ScripturesController:
                 skip
             ))
             
-            scriptures = {}
-            for row in cursor.fetchall():
-                scripture = Scripture(
+            return [
+                Scripture(
                     id=row['id'],
                     name=row['name'],
                     lang_code=row['lang_code'],
                     path=row['path'],
                     stats=deserialize_json(row['stats'])
                 )
-                scriptures[scripture.id] = scripture
-            
-            return scriptures
+                for row in cursor.fetchall()
+            ]
     
     @staticmethod
     def get_by_id(scripture_id: str) -> Optional[Scripture]:

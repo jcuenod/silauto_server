@@ -19,17 +19,19 @@ class ProjectsController:
             return cursor.fetchone()[0]
     
     @staticmethod
-    def get_all() -> Dict[str, ParatextProject]:
+    def get_all(skip = 0, limit = 1000) -> List[ParatextProject]:
         """Get all projects as a dictionary."""
         with get_db() as conn:
             cursor = conn.execute("""
                 SELECT id, name, full_name, iso_code, lang, path, created_at, extract_task_id
                 FROM projects
-            """)
+                ORDER BY created_at DESC
+                LIMIT ?           
+                OFFSET ?
+            """, (limit, skip))
             
-            projects = {}
-            for row in cursor.fetchall():
-                project = ParatextProject(
+            return [
+                ParatextProject(
                     id=row['id'],
                     name=row['name'],
                     full_name=row['full_name'],
@@ -39,9 +41,8 @@ class ProjectsController:
                     created_at=datetime.fromisoformat(row['created_at']),
                     extract_task_id=row['extract_task_id']
                 )
-                projects[project.id] = project
-            
-            return projects
+                for row in cursor.fetchall()
+            ]
     
     @staticmethod
     def get_by_id(project_id: str) -> Optional[ParatextProject]:
@@ -67,6 +68,33 @@ class ProjectsController:
                 created_at=datetime.fromisoformat(row['created_at']),
                 extract_task_id=row['extract_task_id']
             )
+        
+    @staticmethod
+    def get_by_scripture_filename(scripture_filename: str, skip = 0, limit = 1000) -> List[ParatextProject]:
+        """Get a project by its ID."""
+        with get_db() as conn:
+            # scripture_filename
+            cursor = conn.execute("""
+                SELECT id, name, full_name, iso_code, lang, path, created_at, extract_task_id
+                FROM projects
+                WHERE (iso_code || '-' || id) = ?
+                LIMIT ?
+                OFFSET ?
+            """, (scripture_filename, limit, skip,))
+            
+            return [
+                ParatextProject(
+                    id=row['id'],
+                    name=row['name'],
+                    full_name=row['full_name'],
+                    iso_code=row['iso_code'],
+                    lang=row['lang'],
+                    path=row['path'],
+                    created_at=datetime.fromisoformat(row['created_at']),
+                    extract_task_id=row['extract_task_id']
+                )
+                for row in cursor.fetchall()
+            ]
     
     @staticmethod
     def create(project: ParatextProject) -> ParatextProject:
