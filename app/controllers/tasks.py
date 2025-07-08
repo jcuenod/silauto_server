@@ -19,7 +19,7 @@ class TasksController:
             return cursor.fetchone()[0]
     
     @staticmethod
-    def get_all(skip = 0, limit = 1000) -> Dict[str, Task]:
+    def get_all(skip = 0, limit = 1000) -> List[Task]:
         """Get all tasks as a dictionary."""
         with get_db() as conn:
             cursor = conn.execute("""
@@ -32,22 +32,24 @@ class TasksController:
                 limit,
                 skip,
             ))
-            
-            tasks = {}
-            for row in cursor.fetchall():
-                task = Task(
-                    id=row['id'],
-                    kind=row['kind'],
-                    status=TaskStatus(row['status']),
-                    created_at=datetime.fromisoformat(row['created_at']),
-                    started_at=datetime.fromisoformat(row['started_at']) if row['started_at'] else None,
-                    ended_at=datetime.fromisoformat(row['ended_at']) if row['ended_at'] else None,
-                    error=row['error'],
-                    parameters=deserialize_json(row['parameters'])
+
+            return [
+                Task(
+                    id=row["id"],
+                    kind=row["kind"],
+                    status=TaskStatus(row["status"]),
+                    created_at=datetime.fromisoformat(row["created_at"]),
+                    started_at=datetime.fromisoformat(row["started_at"])
+                    if row["started_at"]
+                    else None,
+                    ended_at=datetime.fromisoformat(row["ended_at"])
+                    if row["ended_at"]
+                    else None,
+                    error=row["error"],
+                    parameters=deserialize_json(row["parameters"]),
                 )
-                tasks[task.id] = task
-            
-            return tasks
+                for row in cursor.fetchall()
+            ]
     
     @staticmethod
     def get_by_id(task_id: str) -> Optional[Task]:

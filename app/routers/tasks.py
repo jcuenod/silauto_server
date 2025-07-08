@@ -419,10 +419,6 @@ async def create_extract_task(params: ExtractTaskParams):
 
 
 # # --- General Task Routes (Read, Update, Delete) ---
-def get_all_tasks():
-    tasks = list(tasks_controller.get_all().values())
-    tasks.sort(key=lambda t: t.created_at, reverse=True)
-    return tasks
 
 
 @router.get("/", response_model=List[Task])
@@ -453,9 +449,8 @@ async def read_next_queued_task():
     Retrieve the next queued task.
     """
     next_queued = None
-    for t in tasks_controller.get_all().values():
+    for t in tasks_controller.get_all():
         if t.status == TaskStatus.QUEUED:
-            print(t)
             if next_queued is None or t.created_at < next_queued.created_at:
                 next_queued = t
 
