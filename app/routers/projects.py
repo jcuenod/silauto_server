@@ -11,13 +11,19 @@ import zipfile
 from fastapi.responses import StreamingResponse
 
 from app.constants import EXPERIMENTS_DIR, PARATEXT_PROJECTS_DIR
-from app.models import ExtractTaskParams, ParatextProject
+from app.models import Draft, ExtractTaskParams, ParatextProject
 
 # Import Task related components needed for creation
 from app.models import Task, TaskKind, TaskStatus
 
 PARATEXT_PROJECTS_DIR.mkdir(parents=True, exist_ok=True)  # Ensure upload folder exists
 
+class DraftWithArchiveName(Draft):
+        archive_name: str
+
+def add_arcname_to_draft(draft: Draft) -> DraftWithArchiveName:
+    # Otherwise, create a new DraftWithArcname with arcname set to the filename
+    return DraftWithArchiveName(**draft.model_dump(), archive_name="")
 
 router = APIRouter(
     prefix="/projects",
@@ -363,53 +369,46 @@ async def download_project_drafts(project_id: str):
         )
     
     # Collect all draft files organized by source project ID
-    drafts_by_source = {}  # source_id -> list of files
-    project_tasks = tasks_controller.get_for_project(project)
-    
-    drafts = drafts_controller.get_all(project_id=project.id)
-    # for t in project_tasks:
-    #     if t.kind != TaskKind.DRAFT:
-    #         continue
-        
-    #     exp = t.parameters.experiment_name # type: ignore (always present on .DRAFT)
-    #     source_id = t.parameters.source_scripture_files # type: ignore (always present on .DRAFT)
+    drafts_by_experiment: Dict[str, List[DraftWithArchiveName]] = {}  # source_id -> list of files
+    for task in tasks_controller.get_for_project(project):
+        if task.kind != TaskKind.TRAIN:
+            continue
 
-    #     drafts_dir = EXPERIMENTS_DIR / exp / "infer"
-    #     if not drafts_dir.exists():
-    #         continue
-            
-    #     sfm_files = [f for f in drafts_dir.glob(f"*/{source_id}/*.SFM") if f.is_file()]
-    #     pdf_files = [f for f in sfm_files if f.with_suffix(".pdf").exists()]
-        
-    #     all_files = sfm_files + pdf_files
-        
-    #     if source_id not in drafts_by_source:
-    #         drafts_by_source[source_id] = []
-    #     drafts_by_source[source_id].extend(all_files)
+        experiment = task.parameters.experiment_name # type: ignore
+        experiment_name_without_source = experiment.split("/", 1)[-1]  # Get the experiment name without source_project_id
+        experiment_drafts = [add_arcname_to_draft(d) for d in drafts_controller.get_all(experiment_name=experiment)]
 
-    if not drafts_by_source:
+        # if there are multiple sources in this experiment, we need arcname to be experiment_name/source_project_id/filename
+        # otherwise, we can just use source_project_id/filename
+        # check that d.source_scripture_name is the same for all d in experiment_drafts
+        set_of_source_scripture_names = set(d.source_scripture_name for d in experiment_drafts)
+        if len(set_of_source_scripture_names) > 1:
+            # Multiple source scripture names in this experiment, use experiment name as prefix
+            for d in experiment_drafts:
+                d_path = Path(d.path)
+                d.archive_name = f"{experiment_name_without_source}/{d.source_scripture_name}/{d_path.name}"
+        else:
+            # Single source scripture name, use it directly
+            for d in experiment_drafts:
+                d.archive_name = experiment_name_without_source
+        
+        drafts_by_experiment[experiment] = experiment_drafts
+
+    if not drafts_by_experiment:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No draft files found in this project.",
         )
 
-    # Check for duplicates within each source project
-    for source_id, files in drafts_by_source.items():
-        filenames = [f.name for f in files]
-        if len(filenames) != len(set(filenames)):
-            duplicates = [name for name in set(filenames) if filenames.count(name) > 1]
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Duplicate files found for source project {source_id}: {duplicates}",
-            )
-
     # Create zip with source_project_id/filename structure
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
-        for source_id, files in drafts_by_source.items():
-            for file_path in files:
-                arcname = f"{source_id}/{file_path.name}"
-                zipf.write(file_path, arcname=arcname)
+        for drafts in drafts_by_experiment.values():
+            for draft in drafts:
+                zipf.write(draft.path, arcname=draft.archive_name)
+                if Path(draft.path).with_suffix(".pdf").exists():
+                    zipf.write(Path(draft.path).with_suffix(".pdf"), arcname=draft.archive_name.replace(".SFM", ".pdf"))
+
     zip_buffer.seek(0)
 
     filename = f"{project_id}_drafts.zip"
