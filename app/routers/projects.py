@@ -390,7 +390,8 @@ async def download_project_drafts(project_id: str):
         else:
             # Single source scripture name, use it directly
             for d in experiment_drafts:
-                d.archive_name = experiment_name_without_source
+                d_path = Path(d.path)
+                d.archive_name = f"{experiment_name_without_source}/{d_path.name}"
         
         drafts_by_experiment[experiment] = experiment_drafts
 
