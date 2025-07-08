@@ -3,8 +3,6 @@ Drafts controller for database operations.
 """
 
 from typing import List, Optional
-
-from fastapi import Query
 from app.models import Draft
 from app.controllers.database import get_db
 
@@ -21,9 +19,9 @@ class DraftsController:
     
     @staticmethod
     def get_all(
-        project_id: Optional[str] = Query(None, description="Filter drafts by project ID"),
-        experiment_name: Optional[str] = Query(None, description="Filter drafts by experiment name"),
-        source_scripture_name: Optional[str] = Query(None, description="Filter drafts by source scripture name"),
+        project_id: Optional[str] = None,
+        experiment_name: Optional[str] = None,
+        source_scripture_name: Optional[str] = None,
         skip: int = 0,
         limit: int = 1000
     ) -> List[Draft]:

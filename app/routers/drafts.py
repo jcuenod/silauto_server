@@ -22,7 +22,7 @@ async def _process_draft_file(f: Path):
     try:
         if not f.is_file():
             return None
-        
+
         path_to_draft = str(f)
 
         # Get the infer directory path and append the config.yml file
@@ -94,7 +94,7 @@ async def scan():
     # Bulk insert drafts
     if drafts:
         drafts_controller.bulk_insert(drafts)
-    
+
     print(f"Draft processing complete. Found {len(drafts)} files.")
 
 
@@ -109,20 +109,20 @@ async def read_drafts(
     experiment_name: Optional[str] = Query(
         None, description="Experiment name to filter translations by"
     ),
+    source_scripture_name: Optional[str] = Query(
+        None, description="Filter drafts by source scripture name"
+    ),
+    skip: int = 0,
+    limit: int = 1000,
 ):
     """
     Retrieve a list of available translations for a given project id or experiment name (must provide at least one of the two).
     """
 
-    if not project_id and not experiment_name:
-        raise ValueError("Must provide at least one of project_id or experiment_name")
-
-    drafts = drafts_controller.get_all()
-
-    if project_id:
-        drafts = [t for t in drafts if t.project_id == project_id]
-
-    if experiment_name:
-        drafts = [t for t in drafts if t.train_experiment_name == experiment_name]
-
-    return drafts
+    return drafts_controller.get_all(
+        project_id=project_id,
+        experiment_name=experiment_name,
+        source_scripture_name=source_scripture_name,
+        skip=skip,
+        limit=limit,
+    )
