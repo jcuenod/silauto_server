@@ -10,7 +10,6 @@ from app.models import Scripture
 from app.config import MAX_CONCURRENT_FILE_PROCESSING
 
 router = APIRouter(
-    prefix="/scriptures",
     tags=["scriptures"],
     responses={404: {"description": "Not found"}},
 )

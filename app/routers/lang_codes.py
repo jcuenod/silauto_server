@@ -3,7 +3,6 @@ from fastapi import APIRouter, HTTPException, Query, status
 from app.state import lang_codes_controller
 
 router = APIRouter(
-    prefix="/lang_codes",
     tags=["lang_codes"],
     responses={404: {"description": "Not found"}},
 )

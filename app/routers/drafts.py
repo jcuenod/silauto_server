@@ -9,7 +9,6 @@ from app.config import EXPERIMENTS_DIR
 from app.models import Draft
 
 router = APIRouter(
-    prefix="/drafts",
     tags=["drafts"],
     responses={404: {"description": "Not found"}},
 )

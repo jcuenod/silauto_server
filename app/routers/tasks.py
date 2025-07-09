@@ -31,7 +31,6 @@ from app.templates.align import create_align_config_for
 from app.templates.train import create_train_config_for
 
 router = APIRouter(
-    prefix="/tasks",
     tags=["tasks"],
     responses={404: {"description": "Not found"}},
 )

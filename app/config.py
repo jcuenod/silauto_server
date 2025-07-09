@@ -1,6 +1,7 @@
 """
 Configuration settings for the application.
 """
+
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -17,6 +18,8 @@ SILNLP_DATA = Path(SILNLP_DATA)
 DATABASE_PATH = os.getenv("DATABASE_PATH", "")
 if not DATABASE_PATH:
     raise ValueError("DATABASE_PATH environment variable is not set.")
+
+CLIENT_PATH = os.getenv("CLIENT_PATH", None)
 
 # Performance settings
 MAX_CONCURRENT_FILE_PROCESSING = int(os.getenv("MAX_CONCURRENT_FILE_PROCESSING", "10"))

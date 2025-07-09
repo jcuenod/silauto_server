@@ -26,7 +26,6 @@ def add_arcname_to_draft(draft: Draft) -> DraftWithArchiveName:
     return DraftWithArchiveName(**draft.model_dump(), archive_name="")
 
 router = APIRouter(
-    prefix="/projects",
     tags=["projects"],
     responses={404: {"description": "Not found"}},
 )
