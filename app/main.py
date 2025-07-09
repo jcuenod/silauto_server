@@ -1,6 +1,7 @@
 import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from brotli_asgi import BrotliMiddleware
 
 # Import routers
 from app.routers import drafts, projects, tasks, scriptures, lang_codes
@@ -29,6 +30,9 @@ app.add_middleware(
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
 )
+
+# Add brotli compression middleware
+app.add_middleware(BrotliMiddleware)
 
 # Include routers
 app.include_router(projects.router)
