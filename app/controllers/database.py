@@ -9,7 +9,7 @@ from typing import Any
 from pathlib import Path
 import threading
 
-from app.constants import DATABASE_PATH
+from app.config import DATABASE_PATH
 
 # Thread-local storage for database connections
 _local = threading.local()

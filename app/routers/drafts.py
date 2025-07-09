@@ -5,7 +5,7 @@ from fastapi import APIRouter, Query
 import yaml
 from app.state import drafts_controller
 
-from app.constants import EXPERIMENTS_DIR
+from app.config import EXPERIMENTS_DIR
 from app.models import Draft
 
 router = APIRouter(

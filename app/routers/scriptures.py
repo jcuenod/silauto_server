@@ -5,7 +5,7 @@ from fastapi import APIRouter, Query
 from vref_utils import Vref
 from ..state import scriptures_controller
 
-from app.constants import SCRIPTURE_DIR
+from app.config import SCRIPTURE_DIR
 from app.models import Scripture
 from app.config import MAX_CONCURRENT_FILE_PROCESSING
 

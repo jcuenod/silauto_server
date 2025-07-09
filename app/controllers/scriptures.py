@@ -2,7 +2,7 @@
 Scriptures controller for database operations.
 """
 
-from typing import Dict, List, Optional
+from typing import List, Optional
 from app.models import Scripture
 from app.controllers.database import get_db, serialize_json, deserialize_json
 

@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 import yaml
 import csv
 
-from app.constants import EXPERIMENTS_DIR, SCRIPTURE_DIR
+from app.config import EXPERIMENTS_DIR, SCRIPTURE_DIR
 from app.routers.scriptures import _process_scripture_file
 from app.state import tasks_controller, lang_codes_controller, drafts_controller
 

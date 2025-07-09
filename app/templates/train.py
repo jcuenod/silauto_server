@@ -1,6 +1,6 @@
 import os
 from typing import List, Dict, Optional
-from app.constants import EXPERIMENTS_DIR
+from app.config import EXPERIMENTS_DIR
 
 
 def get_train_config(

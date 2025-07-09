@@ -7,15 +7,6 @@ from brotli_asgi import BrotliMiddleware
 from app.routers import drafts, projects, tasks, scriptures, lang_codes
 from app.state import projects_controller, scriptures_controller, drafts_controller, was_not_initialized
 
-# Import configuration
-from app.config import (
-    ENABLE_SCRIPTURE_CACHE,
-    ENABLE_TRANSLATION_CACHE,
-    ENABLE_PROJECT_CACHE,
-    ENABLE_TASKS_CACHE,
-    SKIP_HEAVY_OPERATIONS_ON_STARTUP,
-)
-
 app = FastAPI(
     title="Project & Task Management API",
     description="API for managing projects and their associated tasks.",
@@ -59,45 +50,20 @@ async def health_check():
     return {
         "status": "healthy",
         "caches": {
-            "projects": projects_controller.count() if ENABLE_PROJECT_CACHE else "disabled",
-            "scriptures": scriptures_controller.count()
-            if ENABLE_SCRIPTURE_CACHE
-            else "disabled",
+            "projects": projects_controller.count(),
+            "scriptures": scriptures_controller.count(),
             "translations": drafts_controller.count()
-            if ENABLE_TRANSLATION_CACHE
-            else "disabled",
         },
     }
 
 async def populate_caches():
     """Populate caches with initial data."""
-    if SKIP_HEAVY_OPERATIONS_ON_STARTUP:
-        print(
-            "Skipping heavy operations on startup (SKIP_HEAVY_OPERATIONS_ON_STARTUP=true)"
-        )
-        print("Caches will be populated on first request")
-        return
-
-    things_to_scan = []
-
-    if ENABLE_PROJECT_CACHE:
-        print("- Scanning projects...")
-        things_to_scan.append(asyncio.to_thread(projects.scan))
-
-    if ENABLE_TRANSLATION_CACHE:
-        print("- Scanning translations...")
-        things_to_scan.append(drafts.scan())
-
-    if ENABLE_SCRIPTURE_CACHE:
-        print("- Scanning scriptures...")
-        things_to_scan.append(scriptures.scan())
-
-    if ENABLE_TASKS_CACHE:
-        print("- Scanning tasks...")
-        things_to_scan.append(tasks.scan())
-
-    if things_to_scan:
-        await asyncio.gather(*things_to_scan)
+    await asyncio.gather(
+        asyncio.to_thread(projects.scan),
+        drafts.scan(),
+        scriptures.scan(),
+        tasks.scan(),
+    )
 
 if was_not_initialized:
     asyncio.create_task(populate_caches())

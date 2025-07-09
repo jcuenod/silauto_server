@@ -3,7 +3,7 @@ Tasks controller for database operations.
 """
 
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import List, Optional
 from app.models import ParatextProject, Task, TaskStatus
 from app.controllers.database import get_db, serialize_json, deserialize_json
 

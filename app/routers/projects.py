@@ -10,7 +10,7 @@ from app.state import tasks_controller, projects_controller, drafts_controller
 import zipfile
 from fastapi.responses import StreamingResponse
 
-from app.constants import EXPERIMENTS_DIR, PARATEXT_PROJECTS_DIR
+from app.config import PARATEXT_PROJECTS_DIR
 from app.models import Draft, ExtractTaskParams, ParatextProject
 
 # Import Task related components needed for creation

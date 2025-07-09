@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-from app.constants import EXPERIMENTS_DIR
+from app.config import EXPERIMENTS_DIR
 
 
 def get_align_config(target_scripture_file, source_scripture_files):
