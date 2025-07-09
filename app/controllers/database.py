@@ -18,10 +18,8 @@ _local = threading.local()
 def get_db_connection() -> sqlite3.Connection:
     """Get a database connection from thread-local storage."""
     if not hasattr(_local, 'connection'):
-        # Ensure the directory exists
-        Path(DATABASE_PATH).parent.mkdir(parents=True, exist_ok=True)
-        
-        _local.connection = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
+        # Ensure the directory exists        
+        _local.connection = sqlite3.connect(Path(DATABASE_PATH) / "silauto.db", check_same_thread=False)
         _local.connection.row_factory = sqlite3.Row
         _local.connection.execute("PRAGMA foreign_keys = ON")
         _local.connection.execute("PRAGMA journal_mode = WAL")

@@ -4,12 +4,12 @@ This project is an api wrapper around the drafting functionality in silnlp. If y
 
 ## Environment Variables
 
-| Variable                         | Description                            | Default         |
-| ---------------------------------| -------------------------------------- | --------------- |
-| `SILNLP_DATA`                    | The folder where silnlp looks for data | `~/silnlp_data` |
-| `MAX_CONCURRENT_FILE_PROCESSING` | Max files to process concurrently      | `10`            |
-| `DATABASE_PATH`                  | Path to the SQLite database file       | `./app.db`      |
-| `CLIENT_PATH`                    | Path to the client files               | `/app/client`   |
+| Variable                         | Description                                                        | Default         |
+| ---------------------------------| ------------------------------------------------------------------ | --------------- |
+| `SILNLP_DATA`                    | The folder where silnlp looks for data                             | `~/silnlp_data` |
+| `MAX_CONCURRENT_FILE_PROCESSING` | Max files to process concurrently                                  | `10`            |
+| `DATABASE_PATH`                  | Path to the SQLite database file (will also store WAL files)       | `./db/`        |
+| `CLIENT_PATH`                    | Path to the client files                                           | `/app/client`   |
 
 ## Running the API Server
 
@@ -39,14 +39,14 @@ docker build -t silauto-api .
 docker run -it --rm \
   -p 8000:8000 \
   -v /path/to/your/silnlp_data:/silnlp_data \
-  -v /path/to/your/app.db:/app/app.db \
+  -v /path/to/your/db_root:/app/db/ \
   -e SILNLP_DATA=/silnlp_data \
-  -e DATABASE_PATH=/app/app.db \
+  -e DATABASE_PATH=/app/db/ \
   -e MAX_CONCURRENT_FILE_PROCESSING=10 \
   silauto-api
 ```
 
 **Notes:**
-- Adjust `/path/to/your/silnlp_data` and `/path/to/your/app.db` to your local paths.
+- Adjust `/path/to/your/silnlp_data` and `/path/to/your/db_root` to your local paths.
 - You can set any of the environment variables below as needed.
 - You can also use a `.env` file and pass it with `--env-file .env`.
