@@ -1,0 +1,27 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+*.log
+.env
+venv/
+.env.*
+.git/
+.gitignore
+Dockerfile
+docker-compose.yml
+*.egg-info/
+requirements.txt.bak
+.idea/
+.vscode/
+
+# Ignore test and coverage files
+.coverage
+htmlcov/
+tests/
+
+# Ignore OS files
+.DS_Store
+Thumbs.db

@@ -1,58 +1,6 @@
 # SilAuto API Server
 
-## Performance & Startup Optimization
-
-If your application is taking a long time to start up, this is likely due to the scanning operations that populate caches on startup. Here are the main causes and solutions:
-
-### Common Causes of Slow Startup
-
-1. **Scripture file processing** - Uses `Vref` from `vref_utils` package to calculate statistics for each `MT/scripture` vref file
-2. **Translation file scanning** - Recursively scans experiment directories with complex glob patterns
-3. **Project file parsing** - Parses XML files for project metadata
-4. **Large data directories** - Many files in SILNLP_DATA directories
-
-### Quick Solutions
-
-#### For Development (Fastest)
-
-Create a `.env` file (copy from `.env.example`) and set:
-
-```env
-SKIP_HEAVY_OPERATIONS_ON_STARTUP=true
-```
-
-This will start the server immediately and populate caches on first request.
-
-#### For Production (Optimized)
-
-```env
-MAX_CONCURRENT_FILE_PROCESSING=5  # Reduce based on your system
-ENABLE_SCRIPTURE_CACHE=false      # If you don't need scripture stats
-ENABLE_TRANSLATION_CACHE=false    # If you don't need translation data
-```
-
-### Diagnostic Tool
-
-Run the startup diagnostic to identify bottlenecks:
-
-```bash
-python diagnose_startup.py
-```
-
-This will:
-
-- Time each scanning operation individually
-- Show which operations are slowest
-- Provide specific recommendations
-- Check if your data directories exist
-
-### Performance Monitoring
-
-Check the health endpoint for cache status:
-
-```bash
-curl http://localhost:8000/health
-```
+This project is an api wrapper around the drafting functionality in silnlp. If you have a working silnlp installation, you can use this repo to faciliate api access to adding projects, creating align/train/translate tasks and retrieving data / downloading drafts.
 
 ## Environment Variables
 
@@ -62,11 +10,42 @@ curl http://localhost:8000/health
 | `MAX_CONCURRENT_FILE_PROCESSING` | Max files to process concurrently      | `10`            |
 | `DATABASE_PATH`                  | Path to the SQLite database file       | `./app.db`      |
 
-## Running the Server
+## Running the API Server
+
+### Running Locally
+
+To run the project locally, follow these steps:
+
+1. **Copy the example environment file:**  
+   This creates a `.env` file with default settings.  
+   `cp .env.example .env`
+
+2. **Edit the `.env` file:**  
+   Update the configuration values in `.env` as needed for your local setup.
+
+3. **Start the development server:**  
+   This command runs the FastAPI app using Uvicorn with auto-reload enabled for development.  
+   `uvicorn app.main:app --reload`
+
+
+### Running with Docker
+
+You can run the API server in a Docker container. This allows you to isolate dependencies and easily manage environment variables and data locations.
 
 ```bash
-# Or configure via .env file
-cp .env.example .env
-# Edit .env with your preferences
-uvicorn app.main:app --reload
+docker build -t silauto-api .
+
+docker run -it --rm \
+  -p 8000:8000 \
+  -v /path/to/your/silnlp_data:/silnlp_data \
+  -v /path/to/your/app.db:/app/app.db \
+  -e SILNLP_DATA=/silnlp_data \
+  -e DATABASE_PATH=/app/app.db \
+  -e MAX_CONCURRENT_FILE_PROCESSING=10 \
+  silauto-api
 ```
+
+**Notes:**
+- Adjust `/path/to/your/silnlp_data` and `/path/to/your/app.db` to your local paths.
+- You can set any of the environment variables below as needed.
+- You can also use a `.env` file and pass it with `--env-file .env`.
