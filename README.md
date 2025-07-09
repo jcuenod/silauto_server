@@ -60,6 +60,7 @@ curl http://localhost:8000/health
 | ---------------------------------| -------------------------------------- | --------------- |
 | `SILNLP_DATA`                    | The folder where silnlp looks for data | `~/silnlp_data` |
 | `MAX_CONCURRENT_FILE_PROCESSING` | Max files to process concurrently      | `10`            |
+| `DATABASE_PATH`                  | Path to the SQLite database file       | `./app.db`      |
 
 ## Running the Server
 
