@@ -56,21 +56,14 @@ curl http://localhost:8000/health
 
 ## Environment Variables
 
-| Variable                           | Description                            | Default         |
-| ---------------------------------- | -------------------------------------- | --------------- |
-| `SILNLP_DATA`                      | The folder where silnlp looks for data | `~/silnlp_data` |
-| `SKIP_HEAVY_OPERATIONS_ON_STARTUP` | Skip all scanning on startup           | `false`         |
-| `MAX_CONCURRENT_FILE_PROCESSING`   | Max files to process concurrently      | `10`            |
-| `ENABLE_SCRIPTURE_CACHE`           | Enable scripture file scanning         | `true`          |
-| `ENABLE_TRANSLATION_CACHE`         | Enable translation file scanning       | `true`          |
-| `ENABLE_PROJECT_CACHE`             | Enable project scanning                | `true`          |
+| Variable                         | Description                            | Default         |
+| ---------------------------------| -------------------------------------- | --------------- |
+| `SILNLP_DATA`                    | The folder where silnlp looks for data | `~/silnlp_data` |
+| `MAX_CONCURRENT_FILE_PROCESSING` | Max files to process concurrently      | `10`            |
 
 ## Running the Server
 
 ```bash
-# With optimizations for fast startup
-SKIP_HEAVY_OPERATIONS_ON_STARTUP=true uvicorn app.main:app --reload
-
 # Or configure via .env file
 cp .env.example .env
 # Edit .env with your preferences
