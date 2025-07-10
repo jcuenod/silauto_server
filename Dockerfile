@@ -1,3 +1,12 @@
+# Build React app
+FROM node:20 AS client-build
+WORKDIR /client
+COPY client/package*.json ./
+RUN npm install
+COPY client .
+RUN npm run build
+
+# Main Python image
 FROM python:3.12-slim
 
 # Set work directory
@@ -10,6 +19,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 # Copy project files
 COPY . .
+
+# Copy built React app from client-build stage
+COPY --from=client-build /client/dist /app/client
 
 # Expose port (default uvicorn port)
 EXPOSE 8000
