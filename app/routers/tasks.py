@@ -505,7 +505,7 @@ async def update_task_status(task_id: str, status_update: TaskStatusUpdate):
         # EXTRACT Task
         if db_task.kind == TaskKind.EXTRACT:
             # here we need to update the project and the list of scriptures
-            matching_scripture_files = list(SCRIPTURE_DIR.glob("*SBT_A_250701.txt"))
+            matching_scripture_files = list(SCRIPTURE_DIR.glob("*.txt"))
             if len(matching_scripture_files) > 1:
                 print(
                     "Warning: Multiple scripture files match - \n",

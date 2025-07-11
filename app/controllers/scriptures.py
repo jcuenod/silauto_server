@@ -108,6 +108,7 @@ class ScripturesController:
             conn.execute("""
                 INSERT INTO scriptures (id, name, lang_code, path, stats)
                 VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO NOTHING
             """, (
                 scripture.id,
                 scripture.name,
