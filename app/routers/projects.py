@@ -1,4 +1,5 @@
 import io
+import os
 import uuid
 import shutil
 import xml.etree.ElementTree as ET
@@ -312,6 +313,12 @@ async def create_project(
         )
         # Add the new project to the database
         projects_controller.create(db_project)
+
+        for root, _dirs, file_list in os.walk(project_path):
+            Path(root).chmod(0o755)
+            for name in file_list:
+                (Path(root) / name).chmod(0o644)
+
         print(
             f"Added project {project_id} to database with extract task {extract_task_id}."
         )
