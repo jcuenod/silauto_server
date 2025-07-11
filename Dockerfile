@@ -12,10 +12,11 @@ FROM python:3.12-slim
 # Set work directory
 WORKDIR /app
 
-# Install dependencies
+# Install dependencies & Create the database directory
 COPY requirements.txt ./
 RUN pip install --no-cache-dir --upgrade pip && \
-    if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi
+    if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi && \
+    mkdir -p /app/db
 
 # Copy project files
 COPY . .
@@ -31,9 +32,6 @@ RUN addgroup --gid $GID appuser && \
 
 # Change ownership of /app to the new user
 RUN chown -R appuser:appuser /app
-
-# Create the database directory that will be mounted
-RUN mkdir -p /app/db && chown appuser:appuser /app/db
 
 # Switch to the new user
 USER appuser
