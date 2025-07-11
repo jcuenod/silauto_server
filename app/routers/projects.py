@@ -235,7 +235,6 @@ async def create_project(
             parts = file.filename.split("/")
             without_leading_dir = "/".join(parts[1:]) if len(parts) > 1 else parts[0]
             file_location = project_path / without_leading_dir
-            print(file_location)
             saved_files.append(file_location)
 
             # make sure the directory exists
