@@ -22,8 +22,11 @@ def _create_vref_and_get_stats(file_path_str: str) -> Dict[str, Any]:
     return vref_instance.stats
 
 
-async def _process_scripture_file(file_path: Path) -> Optional[Scripture]:
+async def _process_scripture_file(file_path: Path | str) -> Optional[Scripture]:
     """Processes a single scripture file asynchronously."""
+    # Convert file_path to Path if it's a string
+    file_path = Path(file_path) if isinstance(file_path, str) else file_path
+
     try:
         # Run the potentially blocking Vref call in a separate thread
         file_path_str = str(file_path)
@@ -88,7 +91,9 @@ async def scan():
     # Sort by name for consistent ordering
     sorted_names = sorted(processed_scriptures.keys())
     scriptures_controller.clear()
-    scriptures_controller.bulk_insert([processed_scriptures[name] for name in sorted_names])
+    scriptures_controller.bulk_insert(
+        [processed_scriptures[name] for name in sorted_names]
+    )
     print(f"Scripture scan complete. Found {len(processed_scriptures)} files.")
 
 
@@ -111,5 +116,4 @@ async def read_scriptures(
     if query:
         return scriptures_controller.query(query, skip, limit)
 
-    
     return scriptures_controller.get_all(skip, limit)

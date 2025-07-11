@@ -505,19 +505,12 @@ async def update_task_status(task_id: str, status_update: TaskStatusUpdate):
         # EXTRACT Task
         if db_task.kind == TaskKind.EXTRACT:
             # here we need to update the project and the list of scriptures
-            matching_scripture_files = list(SCRIPTURE_DIR.glob("*.txt"))
-            if len(matching_scripture_files) > 1:
-                print(
-                    "Warning: Multiple scripture files match - \n",
-                    matching_scripture_files,
-                )
-            elif len(matching_scripture_files) == 0:
-                print("Error: No matching scripture files")
+            matching_scripture_files = list(
+                [str(s) for s in SCRIPTURE_DIR.glob("*.txt")]
+            )
+            new_ids = scriptures_controller.filter_new_ids(matching_scripture_files)
 
-            for s in matching_scripture_files:
-                if scriptures_controller.get_by_id(str(s)):
-                    continue
-
+            for s in new_ids:
                 new_scripture = await _process_scripture_file(s)
                 if not new_scripture:
                     continue
@@ -531,9 +524,15 @@ async def update_task_status(task_id: str, status_update: TaskStatusUpdate):
             if train_task:
                 project_id = train_task.parameters.project_id  # type: ignore
 
-                drafts_list = drafts_controller.get_all(project_id=project_id, experiment_name=params.experiment_name, source_scripture_name=params.source_project_id)
+                drafts_list = drafts_controller.get_all(
+                    project_id=project_id,
+                    experiment_name=params.experiment_name,
+                    source_scripture_name=params.source_project_id,
+                )
                 known_drafted_books = [d.book_name for d in drafts_list]
-                drafted_books = EXPERIMENTS_DIR.glob(f"{params.experiment_name}/infer/*/{params.source_project_id}/*.SFM")
+                drafted_books = EXPERIMENTS_DIR.glob(
+                    f"{params.experiment_name}/infer/*/{params.source_project_id}/*.SFM"
+                )
 
                 for book in drafted_books:
                     usfm_book_name = book.name[2:5]
