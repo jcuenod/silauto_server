@@ -23,6 +23,18 @@ COPY . .
 # Copy built React app from client-build stage
 COPY --from=client-build /client/dist /app/client
 
+# Create a user with the same UID and GID as the host user
+ARG USER_ID=1000
+ARG GROUP_ID=1000
+RUN addgroup --gid $GROUP_ID appuser && \
+    adduser --disabled-password --gecos '' --uid $USER_ID --gid $GROUP_ID appuser
+
+# Change ownership of /app to the new user
+RUN chown -R appuser:appuser /app
+
+# Switch to the new user
+USER appuser
+
 # Expose port (default uvicorn port)
 EXPOSE 8000
 
