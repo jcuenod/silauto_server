@@ -24,10 +24,10 @@ COPY . .
 COPY --from=client-build /client/dist /app/client
 
 # Create a user with the same UID and GID as the host user
-ARG USER_ID=1000
-ARG GROUP_ID=1000
-RUN addgroup --gid $GROUP_ID appuser && \
-    adduser --disabled-password --gecos '' --uid $USER_ID --gid $GROUP_ID appuser
+ARG UID=1000
+ARG GID=1000
+RUN addgroup --gid $GID appuser && \
+    adduser --disabled-password --gecos '' --uid $UID --gid $GID appuser
 
 # Change ownership of /app to the new user
 RUN chown -R appuser:appuser /app
