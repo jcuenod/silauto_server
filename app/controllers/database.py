@@ -6,7 +6,6 @@ import sqlite3
 import json
 from contextlib import contextmanager
 from typing import Any
-from pathlib import Path
 import threading
 
 from app.config import DATABASE_PATH
@@ -17,9 +16,15 @@ _local = threading.local()
 
 def get_db_connection() -> sqlite3.Connection:
     """Get a database connection from thread-local storage."""
-    if not hasattr(_local, 'connection'):
-        # Ensure the directory exists        
-        _local.connection = sqlite3.connect(Path(DATABASE_PATH) / "silauto.db", check_same_thread=False)
+    if not hasattr(_local, 'connection'):       
+        db_path = DATABASE_PATH / "silauto.db"
+        try:
+            _local.connection = sqlite3.connect(db_path, check_same_thread=False)
+        except sqlite3.OperationalError as e:
+            if "unable to open database file" in str(e):
+                raise PermissionError(f"Cannot access database file {db_path}. Check file permissions.") from e
+            raise
+        
         _local.connection.row_factory = sqlite3.Row
         _local.connection.execute("PRAGMA foreign_keys = ON")
         _local.connection.execute("PRAGMA journal_mode = WAL")

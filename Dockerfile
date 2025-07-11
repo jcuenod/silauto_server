@@ -32,6 +32,9 @@ RUN addgroup --gid $GID appuser && \
 # Change ownership of /app to the new user
 RUN chown -R appuser:appuser /app
 
+# Create the database directory that will be mounted
+RUN mkdir -p /app/db && chown appuser:appuser /app/db
+
 # Switch to the new user
 USER appuser
 

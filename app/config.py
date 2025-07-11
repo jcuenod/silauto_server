@@ -20,7 +20,6 @@ if not DATABASE_PATH:
     raise ValueError("DATABASE_PATH environment variable is not set.")
 
 DATABASE_PATH = Path(DATABASE_PATH)
-DATABASE_PATH.mkdir(0o664, True, True)
 
 
 CLIENT_PATH = os.getenv("CLIENT_PATH", None)
