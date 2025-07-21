@@ -4,6 +4,7 @@ WORKDIR /client
 COPY client/package*.json ./
 RUN npm install
 COPY client .
+ENV VITE_API_URL=/api
 RUN npm run build
 
 # Main Python image
