@@ -23,16 +23,9 @@ def get_train_config(
     if training_corpus is None:
         corpus_books = ""
     else:
-        # Convert comma-separated string to list of books
-        corpus_list = [
-            book.strip() for book in training_corpus.split(",") if book.strip()
-        ]
-        if corpus_list:
-            corpus_books = f"""
-    corpus_books:
-{"\n".join([f"    - {book}" for book in corpus_list])}"""
-        else:
-            corpus_books = ""
+        # List of books like: GEN-DEU;-LEV;NT
+        corpus_books = f"""
+    corpus_books: {training_corpus}"""
 
     return f"""data:
   corpus_pairs:
