@@ -3,6 +3,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from brotli_asgi import BrotliMiddleware
 from fastapi.staticfiles import StaticFiles
+import os
+from fastapi.responses import FileResponse
 from app.config import CLIENT_PATH
 from app.routers import drafts, projects, tasks, scriptures, lang_codes
 from app.state import (
@@ -30,26 +32,6 @@ app.add_middleware(
 # Add brotli compression middleware
 app.add_middleware(BrotliMiddleware)
 
-# Include routers
-app.include_router(projects.router, prefix="/api/projects")
-app.include_router(tasks.router, prefix="/api/tasks")
-app.include_router(scriptures.router, prefix="/api/scriptures")
-app.include_router(drafts.router, prefix="/api/drafts")
-app.include_router(lang_codes.router, prefix="/api/lang_codes")
-
-if CLIENT_PATH:
-    app.mount("/", StaticFiles(directory=CLIENT_PATH, html=True), name="client")
-else:
-
-    @app.get("/", tags=["Client"])
-    async def serve_client():
-        """
-        Serve the client application.
-        """
-        return {
-            "message": "Client path is not set. Please configure CLIENT_PATH in .env file."
-        }
-
 
 @app.get("/health", tags=["Health"])
 async def health_check():
@@ -65,6 +47,35 @@ async def health_check():
             "translations": drafts_controller.count(),
         },
     }
+
+
+# Include routers
+app.include_router(projects.router, prefix="/api/projects")
+app.include_router(tasks.router, prefix="/api/tasks")
+app.include_router(scriptures.router, prefix="/api/scriptures")
+app.include_router(drafts.router, prefix="/api/drafts")
+app.include_router(lang_codes.router, prefix="/api/lang_codes")
+
+
+if CLIENT_PATH:
+    app.mount("/", StaticFiles(directory=CLIENT_PATH, html=True), name="client")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa(full_path: str):
+        """
+        Serve React SPA for client-side routes.
+        """
+        return FileResponse(os.path.join(CLIENT_PATH, "index.html"))
+else:
+
+    @app.get("/", tags=["Client"])
+    async def serve_client():
+        """
+        Serve the client application.
+        """
+        return {
+            "message": "Client path is not set. Please configure CLIENT_PATH in .env file."
+        }
 
 
 async def populate_caches():
