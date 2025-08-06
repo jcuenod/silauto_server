@@ -20,7 +20,7 @@ def get_train_config(
         lang_codes_text += f"\n    {code}: {script}"
 
     # Default training corpus or use provided one
-    if training_corpus is None:
+    if training_corpus is None or training_corpus == "":
         corpus_books = ""
     else:
         # List of books like: GEN-DEU;-LEV;NT
