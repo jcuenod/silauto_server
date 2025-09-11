@@ -58,14 +58,19 @@ app.include_router(lang_codes.router, prefix="/api/lang_codes")
 
 
 if CLIENT_PATH:
-    app.mount("/", StaticFiles(directory=CLIENT_PATH, html=True), name="client")
+    app.mount("/", StaticFiles(directory=CLIENT_PATH), name="client")
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_spa(full_path: str):
         """
         Serve React SPA for client-side routes.
         """
-        return FileResponse(os.path.join(CLIENT_PATH, "index.html"))
+        try:
+            # Check if a file exists at the requested path
+            return FileResponse(os.path.join(CLIENT_PATH, full_path))
+        except FileNotFoundError:
+            # If the file is not found, it's a client-side route; serve index.html.
+            return FileResponse(os.path.join(CLIENT_PATH, "index.html"))
 else:
 
     @app.get("/", tags=["Client"])
