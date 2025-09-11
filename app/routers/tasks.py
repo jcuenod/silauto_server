@@ -38,22 +38,6 @@ router = APIRouter(
 
 # # --- Helper Functions ---
 
-
-# # (No longer a dependency, called directly within endpoints)
-# def _validate_project_ids_exist(project_ids: List[str]):
-#     """Checks if a list of project IDs exist in the cache."""
-#     missing_projects = []
-#     for proj_id in project_ids:
-#         if proj_id not in project_cache:
-#             missing_projects.append(str(proj_id))
-#     if missing_projects:
-#         raise HTTPException(
-#             status_code=status.HTTP_400_BAD_REQUEST,
-#             detail=f"Project(s) not found in cache: {', '.join(missing_projects)}",
-#         )
-
-
-# --- Helper Function for Single Project Validation ---
 def _validate_project_id_exists(project_id: str):
     """Checks if a single project ID exists in the database."""
     if not projects_controller.get_by_id(project_id):
