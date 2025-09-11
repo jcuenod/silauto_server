@@ -23,7 +23,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY . .
 
 # Copy built React app from client-build stage
-COPY --from=client-build /client/dist /app/client
+RUN rm -rf client
+COPY --from=client-build /client/dist client
 
 # Create a user with the same UID and GID as the host user
 ARG UID=1000
