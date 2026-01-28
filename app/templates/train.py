@@ -8,6 +8,8 @@ def get_train_config(
     source_scripture_files: List[str],
     lang_codes: Dict[str, str],
     training_corpus: Optional[str] = None,
+    test_size: Optional[int] = 250,
+    val_size: Optional[int] = 250,
 ):
     """Generate training configuration YAML content."""
 
@@ -27,15 +29,25 @@ def get_train_config(
         corpus_books = f"""
     corpus_books: {training_corpus}"""
 
+    # Configure test/val sets based on whether sizes are provided
+    test_size_line = f"\n    test_size: {test_size}" if test_size else ""
+    val_size_line = f"\n    val_size: {val_size}" if val_size else ""
+
+    # Build data type string
+    data_type_parts = ["train"]
+    if test_size:
+        data_type_parts.append("test")
+    if val_size:
+        data_type_parts.append("val")
+    data_type = ",".join(data_type_parts)
+
     return f"""data:
   corpus_pairs:
   - mapping: mixed_src
     src:
-{sources_text}
-    test_size: 250
+{sources_text}{test_size_line}
     trg: {target_scripture_file}
-    type: train,test,val
-    val_size: 250{corpus_books}
+    type: {data_type}{val_size_line}{corpus_books}
   lang_codes:{lang_codes_text}
   seed: 111
   terms:
@@ -72,6 +84,9 @@ def create_train_config_for(
     source_scripture_files: List[str],
     lang_codes: Dict[str, str],
     training_corpus: Optional[str] = None,
+    experiment_suffix: Optional[str] = None,
+    test_size: Optional[int] = 250,
+    val_size: Optional[int] = 250,
 ):
     """Create training configuration file and return the experiment name."""
 
@@ -79,20 +94,27 @@ def create_train_config_for(
         raise Exception("No source scripture files specified")
 
     base_folder = os.path.join(EXPERIMENTS_DIR, project_id)
-    train_folder_name = (
+    base_train_folder_name = (
         source_scripture_files[0].split("-", 1)[-1]
         if len(source_scripture_files) == 1
         else "mixed"
     )
+
+    # Add suffix if provided (e.g., ".all")
+    train_folder_name = (
+        f"{base_train_folder_name}{experiment_suffix}"
+        if experiment_suffix
+        else base_train_folder_name
+    )
     train_folder = os.path.join(base_folder, train_folder_name)
 
-    # Handle folder conflicts by appending suffix
-    suffix = 1
+    # Handle folder conflicts by appending numeric suffix
+    numeric_suffix = 1
     folder_name = train_folder_name
     while os.path.exists(train_folder):
-        folder_name = f"{train_folder_name}_{suffix}"
+        folder_name = f"{train_folder_name}_{numeric_suffix}"
         train_folder = os.path.join(base_folder, folder_name)
-        suffix += 1
+        numeric_suffix += 1
 
     # Create the folder
     os.makedirs(train_folder, exist_ok=True)
@@ -106,6 +128,8 @@ def create_train_config_for(
                 source_scripture_files,
                 lang_codes,
                 training_corpus,
+                test_size=test_size,
+                val_size=val_size,
             )
         )
 

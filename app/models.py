@@ -22,6 +22,12 @@ class TaskStatus(str, Enum):
     UNKNOWN = "unknown"
 
 
+class TrainMode(str, Enum):
+    OT = "ot"
+    EARLY_NT = "early_nt"
+    NT = "nt"
+
+
 # --- Base Models ---
 
 
@@ -64,14 +70,17 @@ class CreateTrainTaskParams(BaseModel):
         description="List of book identifiers (e.g., 'NT', or 'MAT', 'MRK') to use for training",
     )
     lang_codes: Dict[str, str]
+    train_mode: TrainMode = Field(
+        default=TrainMode.OT,
+        description="Training mode: 'ot' (default), 'early_nt', or 'nt'. NT modes create two tasks.",
+    )
 
 
 class TrainTaskParams(CreateTrainTaskParams):
     experiment_name: str
     target_scripture_file: str
     results: Optional[Dict[str, Dict[str, Any]]]
-    # config yml?
-    # other settings...
+    related_task_ids: Optional[List[str]] = None
 
 
 class DraftTaskParams(BaseModel):

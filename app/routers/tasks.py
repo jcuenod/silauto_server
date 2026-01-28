@@ -22,6 +22,7 @@ from app.models import (
     TaskStatusUpdate,
     AlignTaskParams,
     TrainTaskParams,
+    TrainMode,
     DraftTaskParams,
     ExtractTaskParams,
 )
@@ -280,14 +281,18 @@ async def create_align_task(params: CreateAlignTaskParams):
 
 @router.post(
     "/train_task",
-    response_model=Task,
+    response_model=List[Task],
     status_code=status.HTTP_201_CREATED,
     summary="Create Training Task",
 )
 async def create_train_task(params: CreateTrainTaskParams):
     """
-    Create a new **Training** task.
-    Requires valid target and source project IDs.
+    Create new **Training** task(s).
+
+    For 'ot' mode: Creates one task (default behavior).
+    For 'early_nt' or 'nt' mode: Creates two tasks:
+      - An '.all' variant with no test set
+      - A standard variant with test set (100 for early_nt, 250 for nt)
     """
 
     project = projects_controller.get_by_id(params.project_id)
@@ -306,34 +311,73 @@ async def create_train_task(params: CreateTrainTaskParams):
             detail=f"Some scripture files do not exist: {invalid_scripture_files}",
         )
 
-    experiment_name = create_train_config_for(
-        params.project_id,
-        project.scripture_filename,
-        params.source_scripture_files,
-        params.lang_codes,
-        params.training_corpus,
-    )
+    # Determine task configurations based on train_mode
+    if params.train_mode == TrainMode.OT:
+        # Single task with current behavior (test_size=250, val_size=250)
+        configs = [
+            {"suffix": None, "test_size": 250, "val_size": 250}
+        ]
+    else:
+        # NT modes: create two tasks (no validation set for NT)
+        test_size = 250
+        if params.train_mode == TrainMode.NT:
+            test_size = 250
+        elif params.train_mode == TrainMode.EARLY_NT:
+            test_size = 100
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported train mode: {params.train_mode}",
+            )
 
-    task_parameters = TrainTaskParams(
-        project_id=params.project_id,
-        target_scripture_file=project.scripture_filename,
-        experiment_name=experiment_name,
-        source_scripture_files=params.source_scripture_files,
-        training_corpus=params.training_corpus,
-        lang_codes=params.lang_codes,
-        results=None,
-    )
+        configs = [
+            {"suffix": ".all",  "test_size": None,      "val_size": None},
+            {"suffix": None,    "test_size": test_size, "val_size": None},
+        ]
 
-    task_id = str(uuid.uuid4())
-    db_task = Task(
-        id=task_id,
-        kind=TaskKind.TRAIN,
-        status=TaskStatus.QUEUED,
-        created_at=datetime.now(timezone.utc),
-        parameters=task_parameters,
-    )
-    tasks_controller.create(db_task)
-    return db_task
+    # Pre-generate task IDs for cross-referencing
+    task_ids = [str(uuid.uuid4()) for _ in configs]
+
+    created_tasks: List[Task] = []
+
+    for i, config in enumerate(configs):
+        experiment_name = create_train_config_for(
+            params.project_id,
+            project.scripture_filename,
+            params.source_scripture_files,
+            params.lang_codes,
+            params.training_corpus,
+            experiment_suffix=config["suffix"],
+            test_size=config["test_size"],
+            val_size=config["val_size"],
+        )
+
+        # Related task IDs are all other tasks in this batch
+        related_ids = [tid for j, tid in enumerate(task_ids) if j != i] or None
+
+        task_parameters = TrainTaskParams(
+            project_id=params.project_id,
+            target_scripture_file=project.scripture_filename,
+            experiment_name=experiment_name,
+            source_scripture_files=params.source_scripture_files,
+            training_corpus=params.training_corpus,
+            lang_codes=params.lang_codes,
+            train_mode=params.train_mode,
+            results=None,
+            related_task_ids=related_ids,
+        )
+
+        db_task = Task(
+            id=task_ids[i],
+            kind=TaskKind.TRAIN,
+            status=TaskStatus.QUEUED,
+            created_at=datetime.now(timezone.utc),
+            parameters=task_parameters,
+        )
+        tasks_controller.create(db_task)
+        created_tasks.append(db_task)
+
+    return created_tasks
 
 
 @router.post(
