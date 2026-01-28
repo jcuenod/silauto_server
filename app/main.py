@@ -63,14 +63,16 @@ if CLIENT_PATH:
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_spa(full_path: str):
         """
-        Serve React SPA for client-side routes.
+        Serve real files if they exist, otherwise always return index.html
+        (so client-side routes like /tasks work on refresh).
         """
-        try:
-            # Check if a file exists at the requested path
-            return FileResponse(os.path.join(CLIENT_PATH, full_path))
-        except FileNotFoundError:
-            # If the file is not found, it's a client-side route; serve index.html.
-            return FileResponse(os.path.join(CLIENT_PATH, "index.html"))
+        full_path_on_disk = os.path.join(CLIENT_PATH, full_path)
+
+        if full_path and os.path.isfile(full_path_on_disk):
+            return FileResponse(full_path_on_disk)
+
+        return FileResponse(os.path.join(CLIENT_PATH, "index.html"))
+
 else:
 
     @app.get("/", tags=["Client"])
