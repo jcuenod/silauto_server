@@ -2,7 +2,6 @@ import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from brotli_asgi import BrotliMiddleware
-from fastapi.staticfiles import StaticFiles
 import os
 from fastapi.responses import FileResponse
 from app.config import CLIENT_PATH
@@ -58,8 +57,6 @@ app.include_router(lang_codes.router, prefix="/api/lang_codes")
 
 
 if CLIENT_PATH:
-    app.mount("/", StaticFiles(directory=CLIENT_PATH), name="client")
-
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_spa(full_path: str):
         """
@@ -74,7 +71,6 @@ if CLIENT_PATH:
         return FileResponse(os.path.join(CLIENT_PATH, "index.html"))
 
 else:
-
     @app.get("/", tags=["Client"])
     async def serve_client():
         """
